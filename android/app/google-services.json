@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "651327126572",
+    "project_id": "gen-lang-client-0893655267",
+    "storage_bucket": "gen-lang-client-0893655267.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:651327126572:android:df9a284cff89eedaff6589",
+        "android_client_info": {
+          "package_name": "com.smart.pantry"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "651327126572-5ksm7tip13vbe8lmr5r087b1le3h56ar.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDmtkZUB3HpH_I9P8cITASUEgnrbnTLZ3s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "651327126572-5ksm7tip13vbe8lmr5r087b1le3h56ar.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#2A0A10" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Smart Pantry Chef</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600&display=swap');
+      
+      :root {
+        /* Default Dark Theme (Burgundy) */
+        --bg-primary: #2A0A10;
+        --bg-secondary: #3F1016;
+        --bg-tertiary: #52151C;
+        --text-primary: #F3F4F6;
+        --text-secondary: #FECACA; /* red-200 */
+        --accent-color: #F59E0B; /* amber-500 */
+        --border-color: rgba(127, 29, 29, 0.3);
+        --nav-bg: #3F1016;
+      }
+
+      [data-theme='light'] {
+        /* Light Theme (Rose/White) */
+        --bg-primary: #FFF1F2; /* rose-50 */
+        --bg-secondary: #FFFFFF;
+        --bg-tertiary: #FFE4E6; /* rose-100 */
+        --text-primary: #881337; /* rose-900 */
+        --text-secondary: #9F1239; /* rose-800 */
+        --accent-color: #BE123C; /* rose-700 */
+        --border-color: rgba(225, 29, 72, 0.2);
+        --nav-bg: #FFFFFF;
+      }
+      
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+        overscroll-behavior-y: none;
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+      
+      h1, h2, h3, .serif {
+        font-family: 'Playfair Display', serif;
+      }
+
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--bg-primary);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--accent-color);
+        border-radius: 3px;
+        opacity: 0.5;
+      }
+
+      .theme-transition {
+        transition: all 0.3s ease;
+      }
+      
+      .bg-theme-primary { background-color: var(--bg-primary); }
+      .bg-theme-secondary { background-color: var(--bg-secondary); }
+      .text-theme-primary { color: var(--text-primary); }
+      .text-theme-secondary { color: var(--text-secondary); }
+      .border-theme { border-color: var(--border-color); }
+      
+      .gold-gradient {
+        background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      
+      /* Mobile safe area spacing */
+      .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+
+      @keyframes fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes fade-in-up {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in {
+        animation: fade-in 0.3s ease-out forwards;
+      }
+      .animate-fade-in-up {
+        animation: fade-in-up 0.5s ease-out forwards;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

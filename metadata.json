@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Smart Pantry & Chef",
+  "description": " AI-powered pantry inventory tracker and recipe finder using Google Gemini.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

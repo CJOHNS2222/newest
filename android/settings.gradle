@@ -1,0 +1,24 @@
+pluginManagement {
+    repositories {
+        google()  // <--- THIS IS THE MISSING PIECE
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+include ':app'
+include ':capacitor-cordova-android-plugins'
+
+project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google() // Ensure this is here too for library dependencies
+        mavenCentral()
+    }
+}
+
+rootProject.name = "pantry"
+include ':app'
+
+apply from: 'capacitor.settings.gradle'
