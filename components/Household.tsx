@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { User, Household, Member } from '../types';
-import { Users, Mail, Plus, X, UserCircle2 } from 'lucide-react';
+import { Users, Mail, Plus, X, UserCircle2, Send } from 'lucide-react';
+import { sendHouseholdInvitation } from '../services/emailService';
+import { db } from '../firebaseConfig';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 interface HouseholdManagerProps {
   user: User;
@@ -11,24 +14,81 @@ interface HouseholdManagerProps {
 
 export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, household, setHousehold, onClose }) => {
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteMessage, setInviteMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const handleInvite = (e: React.FormEvent) => {
+  const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteEmail) return;
+    if (!inviteEmail || !inviteEmail.includes('@')) {
+      setInviteMessage({ type: 'error', text: 'Please enter a valid email address' });
+      return;
+    }
 
-    const newMember: Member = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: inviteEmail.split('@')[0], // Placeholder name
-      email: inviteEmail,
-      role: 'Member',
-      status: 'Invited'
-    };
+    setInviteLoading(true);
+    setInviteMessage(null);
 
-    setHousehold(prev => ({
-      ...prev,
-      members: [...prev.members, newMember]
-    }));
-    setInviteEmail('');
+    try {
+      // Check if member already exists
+      const memberExists = household.members.some(m => m.email.toLowerCase() === inviteEmail.toLowerCase());
+      if (memberExists) {
+        setInviteMessage({ type: 'error', text: 'This member is already in your household' });
+        setInviteLoading(false);
+        return;
+      }
+
+      // Create new member object
+      const newMember: Member = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: inviteEmail.split('@')[0],
+        email: inviteEmail,
+        role: 'Member',
+        status: 'Invited',
+        invitedAt: new Date().toISOString(),
+        invitedBy: user.email
+      };
+
+      // Send invitation email
+      const emailResult = await sendHouseholdInvitation(
+        inviteEmail,
+        household.name,
+        user.displayName || user.email
+      );
+
+      // Save to local state immediately
+      setHousehold(prev => ({
+        ...prev,
+        members: [...prev.members, newMember]
+      }));
+
+      // Save to Firestore
+      if (household.id) {
+        try {
+          await updateDoc(doc(db, 'households', household.id), {
+            members: arrayUnion(newMember)
+          });
+        } catch (firestoreError) {
+          console.warn('Could not save to Firestore:', firestoreError);
+        }
+      }
+
+      setInviteEmail('');
+      setInviteMessage({
+        type: 'success',
+        text: emailResult.success 
+          ? `Invitation sent to ${inviteEmail}` 
+          : `Member added locally. Email: ${emailResult.message}`
+      });
+
+      // Clear message after 3 seconds
+      setTimeout(() => setInviteMessage(null), 3000);
+    } catch (error) {
+      setInviteMessage({
+        type: 'error',
+        text: `Error: ${error instanceof Error ? error.message : 'Failed to send invitation'}`
+      });
+    } finally {
+      setInviteLoading(false);
+    }
   };
 
   const removeMember = (id: string) => {
@@ -63,16 +123,33 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="Enter email address"
-                  className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-amber-500 outline-none"
+                  disabled={inviteLoading}
+                  className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-amber-500 outline-none disabled:opacity-50"
                 />
               </div>
               <button 
                 type="submit"
-                className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-lg transition-colors"
+                disabled={inviteLoading}
+                className="bg-amber-600 hover:bg-amber-500 disabled:bg-amber-600/50 text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-2"
               >
-                <Plus className="w-5 h-5" />
+                {inviteLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
               </button>
             </form>
+            
+            {inviteMessage && (
+              <div className={`mt-3 text-xs p-2 rounded-lg ${
+                inviteMessage.type === 'success' 
+                  ? 'bg-green-900/30 text-green-200 border border-green-700/50'
+                  : 'bg-red-900/30 text-red-200 border border-red-700/50'
+              }`}>
+                {inviteMessage.text}
+              </div>
+            )}
+
             <p className="text-xs text-red-200/40 mt-2">
               Invited members can view inventory and edit the meal schedule.
             </p>

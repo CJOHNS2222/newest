@@ -90,6 +90,8 @@ export interface Member {
   email: string;
   role: 'Admin' | 'Member';
   status: 'Active' | 'Invited';
+  invitedAt?: string;
+  invitedBy?: string;
 }
 
 export interface Household {
