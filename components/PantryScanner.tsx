@@ -16,6 +16,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({ inventory, setInve
   const [mimeType, setMimeType] = useState<string>("");
   const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
   const [newItemText, setNewItemText] = useState('');
+  const [newQty, setNewQty] = useState(1);
   
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -80,9 +81,21 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({ inventory, setInve
 
   const handleManualAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItemText.trim()) return;
-    setInventory(prev => [...prev, { item: newItemText, category: 'Manual', quantity_estimate: '1' }]);
+    if (!newItemText.trim() || newQty < 1) return;
+    setInventory(prev => {
+      const idx = prev.findIndex(p => p.item.toLowerCase() === newItemText.trim().toLowerCase());
+      if (idx !== -1) {
+        // Merge quantity
+        const updated = [...prev];
+        const prevQty = parseInt(updated[idx].quantity_estimate) || 1;
+        updated[idx].quantity_estimate = (prevQty + newQty).toString();
+        return updated;
+      } else {
+        return [...prev, { item: newItemText.trim(), category: 'Manual', quantity_estimate: newQty.toString() }];
+      }
+    });
     setNewItemText('');
+    setNewQty(1);
   };
 
   return (
@@ -92,7 +105,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({ inventory, setInve
         <p className="text-theme-secondary opacity-60 text-sm mt-1">Items currently in stock</p>
       </div>
 
-      <div className="bg-theme-secondary p-6 rounded-2xl border border-theme shadow-lg relative overflow-hidden">
+      <div className="bg-theme-secondary p-3 rounded-2xl border border-theme shadow-lg relative overflow-hidden max-w-md mx-auto">
         <div 
           className="relative group cursor-pointer transition-all duration-300 z-10"
           onClick={async () => {
@@ -105,15 +118,15 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({ inventory, setInve
           }}
         >
           {imagePreview ? (
-            <div className="relative rounded-xl overflow-hidden aspect-video ring-2 ring-[var(--accent-color)]">
+            <div className="relative rounded-xl overflow-hidden aspect-[4/3] ring-2 ring-[var(--accent-color)] max-w-xs mx-auto" style={{ height: '180px' }}>
               <img src={imagePreview} alt="Preview" className="w-full h-full object-cover opacity-80" />
             </div>
           ) : (
-            <div className="border-2 border-dashed border-theme rounded-xl bg-theme-primary hover:bg-[var(--accent-color)]/5 transition-all aspect-video flex flex-col items-center justify-center gap-4">
-              <div className="p-3 bg-theme-secondary rounded-full shadow-lg group-hover:scale-110 transition-transform">
-                <Upload className="w-6 h-6 text-[var(--accent-color)]" />
+            <div className="border-2 border-dashed border-theme rounded-xl bg-theme-primary hover:bg-[var(--accent-color)]/5 transition-all aspect-[4/3] flex flex-col items-center justify-center gap-2 max-w-xs mx-auto" style={{ height: '180px' }}>
+              <div className="p-2 bg-theme-secondary rounded-full shadow-lg group-hover:scale-110 transition-transform">
+                <Upload className="w-5 h-5 text-[var(--accent-color)]" />
               </div>
-              <p className="text-theme-secondary opacity-70 text-sm font-medium">Scan receipt or pantry</p>
+              <p className="text-theme-secondary opacity-70 text-xs font-medium">Scan receipt or pantry</p>
             </div>
           )}
           <input 
@@ -137,15 +150,23 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({ inventory, setInve
         )}
       </div>
 
-      <form onSubmit={handleManualAdd} className="relative z-10">
+      <form onSubmit={handleManualAdd} className="relative z-10 flex gap-2 items-center">
         <input 
           type="text"
           value={newItemText}
           onChange={(e) => setNewItemText(e.target.value)}
           placeholder="Quick add item..."
-          className="w-full bg-theme-secondary border border-theme rounded-lg px-4 py-3 text-theme-primary shadow-sm outline-none"
+          className="flex-1 bg-theme-secondary border border-theme rounded-lg px-4 py-3 text-theme-primary shadow-sm outline-none"
         />
-        <button type="submit" className="absolute right-3 top-3 text-[var(--accent-color)] hover:scale-110">
+        <input
+          type="number"
+          min={1}
+          value={newQty}
+          onChange={e => setNewQty(Number(e.target.value))}
+          className="w-16 bg-theme-secondary border border-theme rounded-lg px-2 py-3 text-theme-primary shadow-sm focus:border-[var(--accent-color)] outline-none text-center"
+          placeholder="Qty"
+        />
+        <button type="submit" className="text-[var(--accent-color)] hover:scale-110 px-3 py-2 rounded-lg bg-theme-primary">
           <Plus className="w-5 h-5" />
         </button>
       </form>
@@ -153,24 +174,25 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({ inventory, setInve
       <div className="space-y-1">
         {inventory.map((item, idx) => (
           <div key={idx} className="flex items-center justify-between p-4 border-b border-theme bg-theme-secondary rounded-lg">
-             <div className="flex-1">
-                <div className="text-theme-primary font-medium">{item.item}</div>
-                <div className="text-theme-secondary opacity-50 text-xs">{item.category}</div>
-             </div>
-             <div className="flex gap-2">
-                <button 
-                    onClick={() => { removeItem(idx); addToShoppingList([item.item]); }}
-                    className="text-[var(--accent-color)] text-[10px] font-bold uppercase border border-[var(--accent-color)]/30 px-2 py-1 rounded hover:bg-[var(--accent-color)] hover:text-white transition-colors"
-                >
-                    Buy More
-                </button>
-                <button 
-                    onClick={() => removeItem(idx)}
-                    className="text-theme-secondary opacity-30 hover:opacity-100 p-1"
-                >
-                    <Trash2 className="w-4 h-4" />
-                </button>
-             </div>
+           <div className="flex-1">
+            <div className="text-theme-primary font-medium">{item.item}</div>
+            <div className="text-theme-secondary opacity-50 text-xs">{item.category}</div>
+            <div className="text-xs text-theme-secondary opacity-70">Qty: {item.quantity_estimate || 1}</div>
+           </div>
+           <div className="flex gap-2">
+            <button 
+              onClick={() => { removeItem(idx); addToShoppingList([item.item]); }}
+              className="text-[var(--accent-color)] text-[10px] font-bold uppercase border border-[var(--accent-color)]/30 px-2 py-1 rounded hover:bg-[var(--accent-color)] hover:text-white transition-colors"
+            >
+              Buy More
+            </button>
+            <button 
+              onClick={() => removeItem(idx)}
+              className="text-theme-secondary opacity-30 hover:opacity-100 p-1"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+           </div>
           </div>
         ))}
       </div>

@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { db } from '../firebaseConfig';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
 
 const defaultSettings = {
   notifications: {
@@ -15,9 +17,26 @@ const defaultSettings = {
   },
 };
 
-export const Settings: React.FC = () => {
-  const [settings, setSettings] = useState(defaultSettings);
+interface SettingsProps {
+  settings: typeof defaultSettings;
+  setSettings: React.Dispatch<React.SetStateAction<typeof defaultSettings>>;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+  };
+  onLogout?: () => void;
+}
+
+export const Settings: React.FC<SettingsProps> = ({ settings, setSettings, user, onLogout }) => {
+  // ...existing code...
+  const [pendingTheme, setPendingTheme] = useState(settings.theme);
+  const [themeChanged, setThemeChanged] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [sending, setSending] = useState(false);
+  const [pendingNotifications, setPendingNotifications] = useState(settings.notifications);
+  const [notifChanged, setNotifChanged] = useState(false);
 
   const handleChange = (field: string, value: any) => {
     setSettings((prev) => ({
@@ -27,89 +46,187 @@ export const Settings: React.FC = () => {
         ...value,
       },
     }));
+    setNotifChanged(true);
   };
 
-  const handleFeedbackSubmit = (e: React.FormEvent) => {
+  // For notifications and theme, use pending state until confirmed
+    const handleThemeChange = (key: string, value: any) => {
+      setPendingTheme(prev => ({
+        ...prev,
+        [key]: value,
+      }));
+      setThemeChanged(false);
+    };
+
+    const confirmThemeChanges = () => {
+      setSettings(prev => ({
+        ...prev,
+        theme: pendingTheme
+      }));
+      setThemeChanged(true);
+    };
+  const handleNotifChange = (key: string, value: any) => {
+    setPendingNotifications(prev => ({
+      ...prev,
+      [key]: typeof value === 'object' ? { ...prev[key], ...value } : value,
+    }));
+    setNotifChanged(false);
+  };
+
+  const confirmNotifChanges = () => {
+    setSettings(prev => ({
+      ...prev,
+      notifications: pendingNotifications
+    }));
+    setNotifChanged(true);
+  };
+
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Send feedback to backend or email
-    alert('Thank you for your feedback!');
-    setFeedback('');
+    if (!feedback.trim()) return;
+    setSending(true);
+    try {
+      await addDoc(collection(db, 'feedback'), {
+        text: feedback,
+        createdAt: Timestamp.now(),
+        user: user ? {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatar: user.avatar || null
+        } : null
+      });
+      alert('Thank you for your feedback!');
+      setFeedback('');
+    } catch (err) {
+      alert('Failed to send feedback. Please try again later.');
+    }
+    setSending(false);
   };
 
   return (
     <div className="p-6 max-w-md mx-auto">
       <h2 className="text-2xl font-bold mb-4">Settings</h2>
       <div className="mb-6">
-        <h3 className="font-semibold mb-2">Notifications</h3>
-        <label className="flex items-center mb-2">
-          <input
-            type="checkbox"
-            checked={settings.notifications.enabled}
-            onChange={(e) => handleChange('notifications', { enabled: e.target.checked })}
-          />
-          <span className="ml-2">Enable daily notifications</span>
-        </label>
-        <div className="mb-2">
-          <label className="block text-xs mb-1">Notification Time</label>
-          <input
-            type="time"
-            value={settings.notifications.time}
-            onChange={(e) => handleChange('notifications', { time: e.target.value })}
-            className="border rounded px-2 py-1"
-          />
-        </div>
-        <label className="flex items-center mb-1">
-          <input
-            type="checkbox"
-            checked={settings.notifications.types.shoppingList}
-            onChange={(e) => handleChange('notifications', { types: { ...settings.notifications.types, shoppingList: e.target.checked } })}
-          />
-          <span className="ml-2">Shopping List</span>
-        </label>
-        <label className="flex items-center mb-1">
-          <input
-            type="checkbox"
-            checked={settings.notifications.types.mealPlan}
-            onChange={(e) => handleChange('notifications', { types: { ...settings.notifications.types, mealPlan: e.target.checked } })}
-          />
-          <span className="ml-2">Meal Plan</span>
-        </label>
-      </div>
-      <div className="mb-6">
-        <h3 className="font-semibold mb-2">Theme</h3>
-        <label className="block mb-2">
-          <span className="mr-2">Mode:</span>
-          <select
-            value={settings.theme.mode}
-            onChange={(e) => handleChange('theme', { mode: e.target.value })}
-            className="border rounded px-2 py-1"
-          >
-            <option value="dark">Dark</option>
-            <option value="light">Light</option>
-          </select>
-        </label>
-        <label className="block mb-2">
-          <span className="mr-2">Accent Color:</span>
-          <input
-            type="color"
-            value={settings.theme.accentColor}
-            onChange={(e) => handleChange('theme', { accentColor: e.target.value })}
-            className="border rounded px-2 py-1"
-          />
-        </label>
-      </div>
-      <div className="mb-6">
-        <h3 className="font-semibold mb-2">Feedback</h3>
-        <form onSubmit={handleFeedbackSubmit}>
+                <div className="mb-6">
+                  <h3 className="font-semibold mb-2">Notifications</h3>
+                  <label className="flex items-center mb-2">
+                    <input
+                      type="checkbox"
+                      checked={pendingNotifications.enabled}
+                      onChange={e => handleNotifChange('enabled', e.target.checked)}
+                    />
+                    <span className="ml-2">Enable daily notifications</span>
+                  </label>
+                  <div className="mb-2">
+                    <label className="block text-xs mb-1">Notification Time</label>
+                    <input
+                      type="time"
+                      value={pendingNotifications.time}
+                      onChange={e => handleNotifChange('time', e.target.value)}
+                      className="border rounded px-2 py-1"
+                    />
+                  </div>
+                  <label className="flex items-center mb-1">
+                    <input
+                      type="checkbox"
+                      checked={pendingNotifications.types.shoppingList}
+                      onChange={e => handleNotifChange('types', { shoppingList: e.target.checked })}
+                    />
+                    <span className="ml-2">Shopping List</span>
+                  </label>
+                  <label className="flex items-center mb-1">
+                    <input
+                      type="checkbox"
+                      checked={pendingNotifications.types.mealPlan}
+                      onChange={e => handleNotifChange('types', { mealPlan: e.target.checked })}
+                    />
+                    <span className="ml-2">Meal Plan</span>
+                  </label>
+                </div>
+        <form onSubmit={handleFeedbackSubmit} className="mb-6">
+          <label className="block mb-2 font-semibold text-theme-secondary">Send Feedback</label>
           <textarea
             value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            placeholder="Share your ideas or report bugs..."
-            className="w-full border rounded px-2 py-1 mb-2"
+            onChange={e => setFeedback(e.target.value)}
+            placeholder="Let us know your thoughts..."
+            className="w-full p-2 border rounded mb-2 resize-none"
             rows={3}
+            disabled={sending}
           />
-          <button type="submit" className="bg-amber-500 text-white px-4 py-2 rounded">Send Feedback</button>
+          <button
+            type="submit"
+            disabled={sending || !feedback.trim()}
+            className="bg-[var(--accent-color)] text-white px-4 py-2 rounded font-bold w-full"
+          >
+            {sending ? 'Sending...' : 'Send Feedback'}
+          </button>
         </form>
+        {user && onLogout && (
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={onLogout}
+              className="mb-4 bg-red-500 text-white px-4 py-2 rounded font-bold w-full"
+            >
+              Logout
+            </button>
+            <h3 className="font-semibold mb-2">Theme</h3>
+            <label className="block mb-2">
+              <span className="mr-2">Mode:</span>
+              <select
+                value={pendingTheme.mode}
+                onChange={(e) => handleThemeChange('mode', e.target.value)}
+                className="border rounded px-2 py-1"
+              >
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+            </label>
+            <label className="block mb-2">
+              <span className="mr-2">Accent Color:</span>
+              <input
+                type="color"
+                value={pendingTheme.accentColor}
+                onChange={(e) => handleThemeChange('accentColor', e.target.value)}
+                className="border rounded px-2 py-1"
+              />
+            </label>
+            <label className="block mb-2">
+              <span className="mr-2">Background Color:</span>
+              <input
+                type="color"
+                value={pendingTheme.backgroundColor || '#ffffff'}
+                onChange={(e) => handleThemeChange('backgroundColor', e.target.value)}
+                className="border rounded px-2 py-1"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={confirmThemeChanges}
+              className="mt-3 bg-[var(--accent-color)] text-white px-4 py-2 rounded font-bold w-full"
+            >
+              Confirm Theme Changes
+            </button>
+            {themeChanged && (
+              <div className="mt-2 text-green-600 font-bold text-center animate-fade-in">
+                Theme settings have been changed
+              </div>
+            )}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={confirmNotifChanges}
+          className="mt-3 bg-[var(--accent-color)] text-white px-4 py-2 rounded font-bold w-full"
+        >
+          Confirm Notification Changes
+        </button>
+        {notifChanged && (
+          <div className="mt-2 text-green-600 font-bold text-center animate-fade-in">
+            Settings have been changed
+          </div>
+        )}
       </div>
     </div>
   );

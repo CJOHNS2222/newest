@@ -2,29 +2,36 @@ import React, { useState } from 'react';
 import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, ToggleLeft, ToggleRight, Star, Heart, Bookmark } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe } from '../types';
+import { fetchRecipeImage } from '../services/imageService';
 import { RecipeRatingUI } from './RecipeRating';
 
 interface RecipeFinderProps {
-  onAddToPlan: (recipe: StructuredRecipe) => void;
-  onSaveRecipe: (recipe: StructuredRecipe) => void;
-  inventory: PantryItem[];
-  ratings: RecipeRating[];
-  onRate: (rating: RecipeRating) => void;
-  savedRecipes: SavedRecipe[];
+    onAddToPlan: (recipe: StructuredRecipe) => void;
+    onSaveRecipe: (recipe: StructuredRecipe) => void;
+    inventory: PantryItem[];
+    ratings: RecipeRating[];
+    onRate: (rating: RecipeRating) => void;
+    savedRecipes: SavedRecipe[];
+    persistedResult?: RecipeSearchResult | null;
+    setPersistedResult?: (result: RecipeSearchResult | null) => void;
 }
 
-export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, inventory, ratings, onRate, savedRecipes }) => {
-  const [activeView, setActiveView] = useState<'search' | 'saved'>('search');
+export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, inventory, ratings, onRate, savedRecipes, persistedResult, setPersistedResult }) => {
+    const [activeView, setActiveView] = useState<'search' | 'saved'>('search');
   
-  const [specificQuery, setSpecificQuery] = useState('');
-  const [restrictions, setRestrictions] = useState('');
-  const [maxCookTime, setMaxCookTime] = useState<string>('60');
-  const [maxIngredients, setMaxIngredients] = useState<string>('10');
-  const [measurement, setMeasurement] = useState<'Metric' | 'Standard'>('Standard');
-  const [strictMode, setStrictMode] = useState(false);
+    const [specificQuery, setSpecificQuery] = useState('');
+    const [restrictions, setRestrictions] = useState('');
+    const [maxCookTime, setMaxCookTime] = useState<string>('60');
+    const [maxIngredients, setMaxIngredients] = useState<string>('10');
+    const [recipeType, setRecipeType] = useState<'Snack' | 'Dinner' | 'Dessert' | ''>('');
+    const [measurement, setMeasurement] = useState<'Metric' | 'Standard'>('Standard');
+    const [strictMode, setStrictMode] = useState(false);
   
-  const [result, setResult] = useState<RecipeSearchResult | null>(null);
-  const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
+    // Use persistedResult if available
+    const [result, setResult] = useState<RecipeSearchResult | null>(persistedResult || null);
+    const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
+    const [showRecipeModal, setShowRecipeModal] = useState(false);
+    const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
 
   const inventoryString = inventory.map(i => i.item).join(', ');
 
@@ -46,23 +53,26 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     });
   };
 
-  const performSearch = async (params: any) => {
-    setLoadingState(LoadingState.LOADING);
-    setResult(null);
-    try {
-      const data = await searchRecipes({
-        ...params,
-        restrictions,
-        maxCookTime: parseInt(maxCookTime),
-        maxIngredients: parseInt(maxIngredients),
-        measurementSystem: measurement
-      });
-      setResult(data);
-      setLoadingState(LoadingState.SUCCESS);
-    } catch (error) {
-      setLoadingState(LoadingState.ERROR);
-    }
-  };
+    const performSearch = async (params: any) => {
+        setLoadingState(LoadingState.LOADING);
+        setResult(null);
+        if (setPersistedResult) setPersistedResult(null);
+        try {
+            const data = await searchRecipes({
+                ...params,
+                restrictions,
+                maxCookTime: parseInt(maxCookTime),
+                maxIngredients: parseInt(maxIngredients),
+                measurementSystem: measurement,
+                type: recipeType
+            });
+            setResult(data);
+            if (setPersistedResult) setPersistedResult(data);
+            setLoadingState(LoadingState.SUCCESS);
+        } catch (error) {
+            setLoadingState(LoadingState.ERROR);
+        }
+    };
 
   const getRatingInfo = (title: string) => {
       const related = ratings.filter(r => r.recipeTitle.toLowerCase() === title.toLowerCase());
@@ -76,46 +86,58 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
       };
   };
 
-  const renderRecipeCard = (recipe: StructuredRecipe, isSavedView = false) => {
-     const ratingInfo = getRatingInfo(recipe.title);
-     const isSaved = savedRecipes.some(r => r.title === recipe.title);
+        const [imageUrls, setImageUrls] = useState<{ [title: string]: string }>({});
 
-     return (
-        <div key={recipe.title} className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden group hover:shadow-2xl transition-all mb-6">
-            {/* Image Placeholder */}
-            <div className="h-40 relative bg-gray-200 overflow-hidden">
-                <div 
-                    className="absolute inset-0 bg-cover bg-center opacity-80 group-hover:scale-105 transition-transform duration-500"
-                    style={{
-                        backgroundImage: `url(https://source.unsplash.com/600x400/?${encodeURIComponent(recipe.title.split(' ').slice(0,2).join(','))},food)`,
-                        backgroundColor: '#2A0A10' 
-                    }}
-                ></div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent"></div>
-                
-                <div className="absolute bottom-4 left-4 right-4 text-white">
-                    <h4 className="text-xl font-serif font-bold leading-tight mb-1 shadow-black drop-shadow-md">{recipe.title}</h4>
-                    <div className="flex items-center gap-3 text-xs font-medium opacity-90">
-                        <span className="bg-black/40 backdrop-blur px-2 py-1 rounded flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-[var(--accent-color)]" /> {recipe.cookTime}
-                        </span>
-                        {ratingInfo && (
-                            <span className="bg-[var(--accent-color)]/90 px-2 py-1 rounded flex items-center gap-1">
-                                <Star className="w-3 h-3 fill-white" /> {ratingInfo.avg}
-                            </span>
+        React.useEffect(() => {
+            if (result && result.recipes) {
+                result.recipes.forEach(async (recipe) => {
+                    if (!imageUrls[recipe.title]) {
+                        const url = await fetchRecipeImage(recipe.title);
+                        if (url) setImageUrls(prev => ({ ...prev, [recipe.title]: url }));
+                    }
+                });
+            }
+        }, [result]);
+
+        const renderRecipeCard = (recipe: StructuredRecipe, isSavedView = false) => {
+            const ratingInfo = getRatingInfo(recipe.title);
+            const isSaved = savedRecipes.some(r => r.title === recipe.title);
+            const imgUrl = imageUrls[recipe.title] || `https://source.unsplash.com/600x400/?${encodeURIComponent(recipe.title.split(' ').slice(0,2).join(','))},food`;
+
+            return (
+                <div key={recipe.title} className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden group hover:shadow-2xl transition-all mb-6 cursor-pointer" onClick={() => { setModalRecipe(recipe); setShowRecipeModal(true); }}>
+                    {/* Recipe Image */}
+                    <div className="h-40 relative bg-gray-200 overflow-hidden">
+                        <div 
+                            className="absolute inset-0 bg-cover bg-center opacity-80 group-hover:scale-105 transition-transform duration-500"
+                            style={{
+                                backgroundImage: `url(${imgUrl})`,
+                                backgroundColor: '#2A0A10'
+                            }}
+                        ></div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent"></div>
+                        <div className="absolute bottom-4 left-4 right-4 text-white">
+                            <h4 className="text-xl font-serif font-bold leading-tight mb-1 shadow-black drop-shadow-md">{recipe.title}</h4>
+                            <div className="flex items-center gap-3 text-xs font-medium opacity-90">
+                                <span className="bg-black/40 backdrop-blur px-2 py-1 rounded flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-[var(--accent-color)]" /> {recipe.cookTime}
+                                </span>
+                                {ratingInfo && (
+                                    <span className="bg-[var(--accent-color)]/90 px-2 py-1 rounded flex items-center gap-1">
+                                        <Star className="w-3 h-3 fill-white" /> {ratingInfo.avg}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        {!isSavedView && (
+                            <button 
+                                onClick={() => onSaveRecipe(recipe)}
+                                className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all ${isSaved ? 'bg-[var(--accent-color)] text-white' : 'bg-black/30 text-white hover:bg-[var(--accent-color)]'}`}
+                            >
+                                <Heart className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
+                            </button>
                         )}
                     </div>
-                </div>
-
-                {!isSavedView && (
-                    <button 
-                        onClick={() => onSaveRecipe(recipe)}
-                        className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all ${isSaved ? 'bg-[var(--accent-color)] text-white' : 'bg-black/30 text-white hover:bg-[var(--accent-color)]'}`}
-                    >
-                        <Heart className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
-                    </button>
-                )}
-            </div>
 
             <div className="p-6">
                 {ratingInfo && (
@@ -143,13 +165,13 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
                 <div className="flex gap-2">
                     <button 
-                        onClick={() => onAddToPlan(recipe)}
+                        onClick={(e) => { e.stopPropagation(); onAddToPlan(recipe); }}
                         className="flex-1 bg-theme-primary border border-theme hover:border-[var(--accent-color)] text-[var(--accent-color)] font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 hover:bg-[var(--accent-color)] hover:text-white"
                     >
                         <Plus className="w-5 h-5" /> Add to Schedule
                     </button>
                 </div>
-                
+
                 <div className="mt-4 pt-4 border-t border-theme">
                         <RecipeRatingUI recipeTitle={recipe.title} onRate={onRate} />
                 </div>
@@ -263,8 +285,21 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         </div>
                     </div>
 
-                    {/* Inputs Row */}
-                    <div className="grid grid-cols-2 gap-3">
+                    {/* Recipe Type Selector & Inputs Row */}
+                    <div className="grid grid-cols-3 gap-3">
+                        <div>
+                            <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Type</label>
+                            <select
+                              value={recipeType}
+                              onChange={e => setRecipeType(e.target.value as 'Snack' | 'Dinner' | 'Dessert' | '')}
+                              className="w-full p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                            >
+                              <option value="">Any</option>
+                              <option value="Snack">Quick Snack</option>
+                              <option value="Dinner">Dinner</option>
+                              <option value="Dessert">Dessert</option>
+                            </select>
+                        </div>
                         <div>
                             <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Time</label>
                             <div className="relative">
@@ -272,9 +307,9 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                 type="number"
                                 value={maxCookTime}
                                 onChange={(e) => setMaxCookTime(e.target.value)}
-                                className="w-full p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                                className="w-16 p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
                                 />
-                                <span className="absolute right-3 top-2.5 opacity-50 text-[10px] font-bold mt-1">MIN</span>
+                                <span className="absolute right-2 top-2.5 opacity-50 text-[10px] font-bold mt-1">MIN</span>
                             </div>
                         </div>
                         <div>
@@ -283,7 +318,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                 type="number"
                                 value={maxIngredients}
                                 onChange={(e) => setMaxIngredients(e.target.value)}
-                                className="w-full p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                                className="w-16 p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
                             />
                         </div>
                     </div>
@@ -306,8 +341,38 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             )}
 
             {result && result.recipes && (
-                <div className="animate-fade-in-up space-y-8 mt-8">
-                    {result.recipes.map((recipe, idx) => renderRecipeCard(recipe))}
+                    <div className="animate-fade-in-up space-y-8 mt-8">
+                            {result.recipes.map((recipe, idx) => renderRecipeCard(recipe))}
+                    </div>
+            )}
+
+            {/* Modal for full recipe details */}
+            {showRecipeModal && modalRecipe && (
+                <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowRecipeModal(false)}>
+                    <div className="bg-theme-primary rounded-2xl shadow-2xl p-0 max-w-lg w-full relative flex flex-col" onClick={e => e.stopPropagation()}>
+                        <button className="sticky top-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-t-2xl flex items-center justify-center hover:bg-red-500 transition-all" onClick={() => setShowRecipeModal(false)}>
+                            CLOSE &times;
+                        </button>
+                        <div className="overflow-y-auto max-h-[70vh] p-8">
+                            <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{modalRecipe.title}</h2>
+                            <p className="mb-4 text-theme-secondary opacity-70">{modalRecipe.description}</p>
+                            <div className="mb-4">
+                                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Ingredients</h4>
+                                <ul className="list-disc list-inside text-theme-secondary opacity-80">
+                                    {modalRecipe.ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Instructions</h4>
+                                <ol className="list-decimal list-inside text-theme-secondary opacity-80 space-y-1">
+                                    {modalRecipe.instructions.map((step, i) => <li key={i}>{step}</li>)}
+                                </ol>
+                            </div>
+                        </div>
+                        <button className="sticky bottom-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-b-2xl flex items-center justify-center hover:bg-red-500 transition-all" onClick={() => setShowRecipeModal(false)}>
+                            CLOSE &times;
+                        </button>
+                    </div>
                 </div>
             )}
         </>

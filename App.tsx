@@ -11,7 +11,7 @@ import { ShoppingList } from './components/ShoppingList';
 import { Community } from './components/Community';
 import { Settings } from './components/Settings';
 import { ChefHat, ShoppingBasket, CalendarDays, UtensilsCrossed, Users, Sun, Moon } from 'lucide-react';
-import { User, PantryItem, DayPlan, StructuredRecipe, Household, ShoppingItem, SavedRecipe, RecipeRating } from './types';
+import { User, PantryItem, DayPlan, StructuredRecipe, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult } from './types';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { getAnalytics, logEvent } from 'firebase/analytics';
 
@@ -29,6 +29,8 @@ type Theme = 'dark' | 'light';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.PANTRY);
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'dark');
+  // Persist generated recipes across tab changes
+  const [persistedRecipeResult, setPersistedRecipeResult] = useState<RecipeSearchResult | null>(null);
   
   // User State
   const [user, setUser] = useState<User | null>(() => {
@@ -73,8 +75,10 @@ const App: React.FC = () => {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', settings.theme.mode);
     localStorage.setItem('theme', settings.theme.mode);
-    // Optionally update accent color in CSS variables
     document.documentElement.style.setProperty('--accent-color', settings.theme.accentColor);
+    if (settings.theme.backgroundColor) {
+      document.documentElement.style.setProperty('--theme-background', settings.theme.backgroundColor);
+    }
   }, [settings.theme]);
 
   // Init Meal Plan
@@ -245,7 +249,7 @@ const App: React.FC = () => {
   if (!user) return <Login onLogin={handleLogin} />;
 
   return (
-    <div className="min-h-screen flex flex-col max-w-md mx-auto bg-theme-primary shadow-2xl overflow-hidden relative border-x border-theme transition-colors duration-300">
+    <div className="min-h-screen flex flex-col max-w-md mx-auto shadow-2xl overflow-hidden relative border-x border-theme transition-colors duration-300" style={{ background: 'var(--theme-background, var(--theme-primary))' }}>
       
       {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
       {showHousehold && (
@@ -281,10 +285,16 @@ const App: React.FC = () => {
             </div>
 
             <button 
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                onClick={() => setSettings(prev => ({
+                  ...prev,
+                  theme: {
+                    ...prev.theme,
+                    mode: prev.theme.mode === 'dark' ? 'light' : 'dark'
+                  }
+                }))}
                 className="p-2 text-theme-secondary opacity-70 hover:opacity-100"
             >
-                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                {settings.theme.mode === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
         </div>
       </header>
@@ -302,31 +312,55 @@ const App: React.FC = () => {
                 }}
             />
         )}
+        {activeTab === Tab.MEALS && (
+          <MealPlanner
+            mealPlan={mealPlan}
+            setMealPlan={setMealPlan}
+            inventory={inventory}
+            addToShoppingList={(items) => {
+              const newItems = items.map(i => ({ id: Math.random().toString(36).substr(2,9), item: i, category: 'Manual', checked: false }));
+              setShoppingList(prev => [...prev, ...newItems]);
+              setActiveTab(Tab.SHOPPING);
+            }}
+          />
+        )}
         
         {activeTab === Tab.SHOPPING && (
             <ShoppingList 
-                items={shoppingList} 
-                setItems={setShoppingList} 
-                onMoveToPantry={(items) => {
-                    const pantryItems = items.map(i => ({ item: i.item, category: i.category, quantity_estimate: '1' }));
-                    setInventory(prev => [...prev, ...pantryItems]);
-                }}
+              items={shoppingList} 
+              setItems={setShoppingList} 
+              onMoveToPantry={(items) => {
+                // Merge shopping list items into inventory
+                setInventory(prev => {
+                  const updated = [...prev];
+                  items.forEach(i => {
+                    const idx = updated.findIndex(p => p.item.toLowerCase() === i.item.toLowerCase());
+                    let addQty = typeof i.quantity === 'number' ? i.quantity : 1;
+                    if (addQty < 1) addQty = 1; // Always add at least 1
+                    if (idx !== -1) {
+                      // Always add, never subtract
+                      const prevQty = parseInt(updated[idx].quantity_estimate) || 1;
+                      updated[idx].quantity_estimate = (prevQty + Math.abs(addQty)).toString();
+                    } else {
+                      updated.push({ item: i.item, category: i.category, quantity_estimate: Math.abs(addQty).toString() });
+                    }
+                  });
+                  // Merge duplicates in inventory
+                  const merged: { [key: string]: PantryItem } = {};
+                  updated.forEach(p => {
+                    const key = p.item.toLowerCase();
+                    if (merged[key]) {
+                      merged[key].quantity_estimate = (parseInt(merged[key].quantity_estimate) + parseInt(p.quantity_estimate)).toString();
+                    } else {
+                      merged[key] = { ...p };
+                    }
+                  });
+                  return Object.values(merged);
+                });
+              }}
             />
         )}
 
-        {activeTab === Tab.MEALS && (
-            <MealPlanner 
-                mealPlan={mealPlan} 
-                setMealPlan={setMealPlan} 
-                inventory={inventory}
-                addToShoppingList={(items) => {
-                    const newItems = items.map(i => ({ id: Math.random().toString(36).substr(2,9), item: i, category: 'Planned Meal', checked: false }));
-                    setShoppingList(prev => [...prev, ...newItems]);
-                    setActiveTab(Tab.SHOPPING);
-                }}
-            />
-        )}
-        
         {activeTab === Tab.RECIPES && (
             <RecipeFinder 
                 onAddToPlan={handleAddToPlan} 
@@ -339,6 +373,8 @@ const App: React.FC = () => {
                   // TODO: Implement recipe sharing logic (e.g., send to another household)
                   alert(`Recipe shared: ${recipe.title}`);
                 }}
+                persistedResult={persistedRecipeResult}
+                setPersistedResult={setPersistedRecipeResult}
             />
         )}
 
@@ -350,7 +386,7 @@ const App: React.FC = () => {
         )}
 
         {activeTab === Tab.SETTINGS && (
-          <Settings settings={settings} setSettings={setSettings} />
+          <Settings settings={settings} setSettings={setSettings} user={user || undefined} onLogout={handleLogout} />
         )}
       </main>
 
@@ -386,6 +422,6 @@ const App: React.FC = () => {
       </nav>
     </div>
   );
-};
+}
 
 export default App;

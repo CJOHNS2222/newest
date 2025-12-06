@@ -12,6 +12,8 @@ interface MealPlannerProps {
 export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList }) => {
   const [draggedMeal, setDraggedMeal] = useState<{ dayIndex: number, mealIndex: number } | null>(null);
   const [missingItemsCount, setMissingItemsCount] = useState(0);
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
+  const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
 
   const getMissingIngredients = () => {
     const allNeededIngredients = mealPlan.flatMap(day => 
@@ -114,28 +116,53 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                     </div>
                 )}
                 {day.meals.map((meal, mealIndex) => (
-                    <div
-                        key={meal.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, dayIndex, mealIndex)}
-                        className="bg-theme-primary border border-theme rounded-lg p-3 flex justify-between items-center cursor-move hover:border-[var(--accent-color)]/50 group shadow-sm active:cursor-grabbing"
-                    >
-                        <div>
-                            <span className="text-[var(--accent-color)] font-bold text-sm block">{meal.recipe.title}</span>
-                            <span className="text-xs opacity-60">{meal.recipe.cookTime}</span>
-                        </div>
-                        <button 
-                            onClick={() => removeMeal(dayIndex, mealIndex)}
-                            className="text-theme-secondary opacity-30 hover:opacity-100 p-1"
-                        >
-                             <Trash2 className="w-4 h-4" />
-                        </button>
+                  <div
+                    key={meal.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, dayIndex, mealIndex)}
+                    className="bg-theme-primary border border-theme rounded-lg p-3 flex justify-between items-center cursor-move hover:border-[var(--accent-color)]/50 group shadow-sm active:cursor-grabbing"
+                    onClick={() => { setModalRecipe(meal.recipe); setShowRecipeModal(true); }}
+                  >
+                    <div>
+                      <span className="text-[var(--accent-color)] font-bold text-sm block">{meal.recipe.title}</span>
+                      <span className="text-xs opacity-60">{meal.recipe.cookTime}</span>
                     </div>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); removeMeal(dayIndex, mealIndex); }}
+                      className="text-theme-secondary opacity-30 hover:opacity-100 p-1"
+                    >
+                       <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 ))}
             </div>
           </div>
         ))}
       </div>
+      {/* Modal for full recipe details */}
+      {showRecipeModal && modalRecipe && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowRecipeModal(false)}>
+          <div className="bg-theme-primary rounded-2xl shadow-2xl p-8 max-w-lg w-full relative" onClick={e => e.stopPropagation()}>
+            <button className="absolute top-3 right-3 text-theme-secondary opacity-50 hover:opacity-100" onClick={() => setShowRecipeModal(false)}>
+              &times;
+            </button>
+            <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{modalRecipe.title}</h2>
+            <p className="mb-4 text-theme-secondary opacity-70">{modalRecipe.description}</p>
+            <div className="mb-4">
+              <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Ingredients</h4>
+              <ul className="list-disc list-inside text-theme-secondary opacity-80">
+                {modalRecipe.ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Instructions</h4>
+              <ol className="list-decimal list-inside text-theme-secondary opacity-80 space-y-1">
+                {modalRecipe.instructions.map((step, i) => <li key={i}>{step}</li>)}
+              </ol>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

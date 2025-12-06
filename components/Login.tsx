@@ -1,3 +1,18 @@
+  const handleForgotPassword = async () => {
+    setError(null);
+    setSuccess(null);
+    if (!validateEmail(email)) {
+      setError('Please enter your email address above to reset password.');
+      return;
+    }
+    try {
+      const auth = getAuth();
+      await auth.sendPasswordResetEmail(email);
+      setSuccess('Password reset email sent! Please check your inbox.');
+    } catch (error) {
+      setError('Failed to send reset email: ' + (error as Error).message);
+    }
+  };
 import React, { useState, useEffect } from 'react';
 import { ChefHat, Mail, Chrome } from 'lucide-react';
 import { User } from '../types';
@@ -186,6 +201,15 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               placeholder="••••••••"
               required
             />
+             {!isSignup && (
+               <button
+                 type="button"
+                 onClick={handleForgotPassword}
+                 className="w-full mt-2 text-amber-400 underline text-xs text-left hover:text-amber-500"
+               >
+                 Forgot password?
+               </button>
+             )}
           </div>
           {isSignup && (
             <div>
