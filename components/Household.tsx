@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User, Household, Member } from '../types';
-import { Users, Mail, Plus, X, UserCircle2 } from 'lucide-react';
+import { Users, Mail, Plus, X } from 'lucide-react';
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 interface HouseholdManagerProps {
   user: User;
@@ -11,27 +12,43 @@ interface HouseholdManagerProps {
 
 export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, household, setHousehold, onClose }) => {
   const [inviteEmail, setInviteEmail] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
 
-  const handleInvite = (e: React.FormEvent) => {
+  const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteEmail) return;
+    if (!inviteEmail || isInviting) return;
 
-    const newMember: Member = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: inviteEmail.split('@')[0], // Placeholder name
-      email: inviteEmail,
-      role: 'Member',
-      status: 'Invited'
-    };
+    setIsInviting(true);
+    try {
+      const functions = getFunctions();
+      const inviteMember = httpsCallable(functions, 'inviteMember');
+      await inviteMember({ email: inviteEmail, householdId: household.id });
 
-    setHousehold(prev => ({
-      ...prev,
-      members: [...prev.members, newMember]
-    }));
-    setInviteEmail('');
+      const newMember: Member = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: inviteEmail.split('@')[0], // Placeholder name
+        email: inviteEmail,
+        role: 'Member',
+        status: 'Pending Invitation'
+      };
+
+      setHousehold(prev => ({
+        ...prev,
+        members: [...prev.members, newMember]
+      }));
+      setInviteEmail('');
+      console.log("Invitation sent successfully!");
+
+    } catch (error) {
+      console.error("Error sending invitation:", error);
+      // Here you might want to show an error message to the user
+    } finally {
+      setIsInviting(false);
+    }
   };
 
   const removeMember = (id: string) => {
+    // This should also be a backend call in a real app
     setHousehold(prev => ({
       ...prev,
       members: prev.members.filter(m => m.id !== id)
@@ -64,13 +81,15 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="Enter email address"
                   className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-amber-500 outline-none"
+                  disabled={isInviting}
                 />
               </div>
               <button 
                 type="submit"
-                className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-lg transition-colors"
+                className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center w-12"
+                disabled={isInviting}
               >
-                <Plus className="w-5 h-5" />
+                {isInviting ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Plus className="w-5 h-5" />}
               </button>
             </form>
             <p className="text-xs text-red-200/40 mt-2">
