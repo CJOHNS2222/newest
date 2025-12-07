@@ -384,6 +384,8 @@ const App: React.FC = () => {
             setMealPlan={setMealPlan}
             inventory={inventory}
             setInventory={setInventory}
+            ratings={ratings}
+            onRate={handleAddRating}
             addToShoppingList={(items) => {
               const newItems = items.map(i => ({ id: Math.random().toString(36).substr(2,9), item: i, category: 'Manual', checked: false }));
               setShoppingList(prev => [...prev, ...newItems]);

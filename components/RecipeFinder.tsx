@@ -28,13 +28,26 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [measurement, setMeasurement] = useState<'Metric' | 'Standard'>('Standard');
     const [strictMode, setStrictMode] = useState(false);
   
+    // Basic pantry staples that don't need to be inventoried
+    const basicIngredients = ['water', 'salt', 'pepper', 'oil', 'butter', 'olive oil', 'vegetable oil', 'cooking oil', 'garlic powder', 'onion powder', 'flour', 'sugar', 'vinegar', 'soy sauce', 'honey', 'lemon juice', 'lime juice'];
+    
+    const isBasicIngredient = (ingredient: string): boolean => {
+      const ingredientLower = ingredient.toLowerCase().trim();
+      return basicIngredients.some(basic => ingredientLower.includes(basic) || basic.includes(ingredientLower.split(/\d+/)[0].trim()));
+    };
+    
     // Use persistedResult if available
   
     const handleRecipeMade = (recipe: StructuredRecipe) => {
-      // Parse ingredients and remove matching items from inventory
+      // Parse ingredients and remove matching items from inventory (excluding basic staples)
       const updatedInventory = [...inventory];
       
       recipe.ingredients.forEach(ingredient => {
+        // Skip basic ingredients
+        if (isBasicIngredient(ingredient)) {
+          return;
+        }
+        
         const ingredientLower = ingredient.toLowerCase();
         // Find matching inventory item
         const matchingIndex = updatedInventory.findIndex(item => 
@@ -195,7 +208,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     </button>
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-theme">
+                <div className="mt-4 pt-4 border-t border-theme" onClick={e => e.stopPropagation()}>
                         <RecipeRatingUI recipeTitle={recipe.title} onRate={onRate} />
                 </div>
             </div>
@@ -372,11 +385,11 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             {/* Modal for full recipe details */}
             {showRecipeModal && modalRecipe && (
                 <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowRecipeModal(false)}>
-                    <div className="bg-theme-primary rounded-2xl shadow-2xl p-0 max-w-lg w-full relative flex flex-col" onClick={e => e.stopPropagation()}>
+                    <div className="bg-theme-primary rounded-2xl shadow-2xl p-0 max-w-lg w-full relative flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
                         <button className="sticky top-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-t-2xl flex items-center justify-center hover:bg-red-500 transition-all" onClick={() => setShowRecipeModal(false)}>
                             CLOSE &times;
                         </button>
-                        <div className="overflow-y-auto max-h-[70vh] p-8">
+                        <div className="overflow-y-auto flex-1 p-8">
                             <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{modalRecipe.title}</h2>
                             <p className="mb-4 text-theme-secondary opacity-70">{modalRecipe.description}</p>
                             <div className="mb-4">
@@ -385,11 +398,14 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                     {modalRecipe.ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
                                 </ul>
                             </div>
-                            <div>
+                            <div className="mb-6">
                                 <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Instructions</h4>
                                 <ol className="list-decimal list-inside text-theme-secondary opacity-80 space-y-1">
                                     {modalRecipe.instructions.map((step, i) => <li key={i}>{step}</li>)}
                                 </ol>
+                            </div>
+                            <div className="border-t border-theme pt-4">
+                                <RecipeRatingUI recipeTitle={modalRecipe.title} onRate={onRate} />
                             </div>
                         </div>
                         <div className="sticky bottom-0 z-10 w-full flex gap-2 p-4 bg-theme-secondary rounded-b-2xl">

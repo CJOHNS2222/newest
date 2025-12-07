@@ -117,7 +117,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         });
       }
     } catch (error) {
-      alert('Google login failed: ' + (error as Error).message);
+      const errorMessage = (error as any).code || (error as Error).message;
+      console.error('Google login error:', errorMessage);
+      if (errorMessage !== 'auth/popup-closed-by-user') {
+        alert('Google login failed: ' + errorMessage);
+      }
     }
   };
 
@@ -138,13 +142,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           });
         }
       } catch (error) {
-        // Ignore if no redirect result
+        console.error('Google redirect result error:', error);
       }
     };
     checkRedirect();
-    // Only run on mount
-    // eslint-disable-next-line
-  }, []);
+  }, [onLogin]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#2A0A10] text-white relative overflow-hidden">
