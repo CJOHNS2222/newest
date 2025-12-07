@@ -22,22 +22,19 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     try {
       const functions = getFunctions();
       const inviteMember = httpsCallable(functions, 'inviteMember');
-      await inviteMember({ email: inviteEmail, householdId: household.id });
+      
+      // The cloud function returns the new member data upon success
+      const result = await inviteMember({ email: inviteEmail, householdId: household.id });
+      const { newMember } = result.data as { newMember: Member };
 
-      const newMember: Member = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: inviteEmail.split('@')[0], // Placeholder name
-        email: inviteEmail,
-        role: 'Member',
-        status: 'Pending Invitation'
-      };
-
+      // Update the local state with the official member data from the server
       setHousehold(prev => ({
         ...prev,
         members: [...prev.members, newMember]
       }));
+
       setInviteEmail('');
-      console.log("Invitation sent successfully!");
+      console.log("Invitation sent and member added as pending!");
 
     } catch (error) {
       console.error("Error sending invitation:", error);
