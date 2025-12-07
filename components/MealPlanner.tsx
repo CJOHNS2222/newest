@@ -6,14 +6,37 @@ interface MealPlannerProps {
   mealPlan: DayPlan[];
   setMealPlan: React.Dispatch<React.SetStateAction<DayPlan[]>>;
   inventory: PantryItem[];
+  setInventory: React.Dispatch<React.SetStateAction<PantryItem[]>>;
   addToShoppingList: (items: string[]) => void;
 }
 
-export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList }) => {
+export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, setInventory, addToShoppingList }) => {
   const [draggedMeal, setDraggedMeal] = useState<{ dayIndex: number, mealIndex: number } | null>(null);
   const [missingItemsCount, setMissingItemsCount] = useState(0);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
+
+  const handleRecipeMade = (recipe: StructuredRecipe) => {
+    // Parse ingredients and remove matching items from inventory
+    const updatedInventory = [...inventory];
+    
+    recipe.ingredients.forEach(ingredient => {
+      const ingredientLower = ingredient.toLowerCase();
+      // Find matching inventory item
+      const matchingIndex = updatedInventory.findIndex(item => 
+        ingredientLower.includes(item.item.toLowerCase()) || 
+        item.item.toLowerCase().includes(ingredientLower.split(/\d+/)[0].trim())
+      );
+      
+      if (matchingIndex !== -1) {
+        updatedInventory.splice(matchingIndex, 1);
+      }
+    });
+    
+    setInventory(updatedInventory);
+    setShowRecipeModal(false);
+    alert(`✓ Ingredients removed from inventory!`);
+  };
 
   const getMissingIngredients = () => {
     const allNeededIngredients = mealPlan.flatMap(day => 
@@ -154,11 +177,19 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
                 {modalRecipe.ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
               </ul>
             </div>
-            <div>
+            <div className="mb-4">
               <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Instructions</h4>
               <ol className="list-decimal list-inside text-theme-secondary opacity-80 space-y-1">
                 {modalRecipe.instructions.map((step, i) => <li key={i}>{step}</li>)}
               </ol>
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button className="flex-1 py-3 text-lg font-bold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all" onClick={() => handleRecipeMade(modalRecipe)}>
+                ✓ Made
+              </button>
+              <button className="flex-1 py-3 text-lg font-bold text-white bg-[var(--accent-color)] rounded-lg hover:bg-red-500 transition-all" onClick={() => setShowRecipeModal(false)}>
+                Close
+              </button>
             </div>
           </div>
         </div>

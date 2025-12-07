@@ -70,13 +70,19 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : { id: '', name: '', members: [] };
   });
 
-  const [settings, setSettings] = useState({
-    notifications: {
-      enabled: true,
-      time: '09:00',
-      types: { shoppingList: true, mealPlan: true },
-    },
-    theme: { mode: theme, accentColor: '#4CAF50' },
+  const [settings, setSettings] = useState(() => {
+    const saved = localStorage.getItem('settings');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    return {
+      notifications: {
+        enabled: true,
+        time: '09:00',
+        types: { shoppingList: true, mealPlan: true },
+      },
+      theme: { mode: theme, accentColor: '#4CAF50' },
+    };
   });
 
   const analytics = getAnalytics();
@@ -90,6 +96,11 @@ const App: React.FC = () => {
       document.documentElement.style.setProperty('--theme-background', settings.theme.backgroundColor);
     }
   }, [settings.theme]);
+
+  // Persist settings to localStorage
+  useEffect(() => {
+    localStorage.setItem('settings', JSON.stringify(settings));
+  }, [settings]);
 
   // Init Meal Plan
   useEffect(() => {
@@ -232,47 +243,63 @@ const App: React.FC = () => {
 
   // Notification Scheduling
   useEffect(() => {
-    if (settings.notifications.enabled) {
-      // Cancel previous notifications
-      LocalNotifications.cancel({ notifications: [{ id: 1 }, { id: 2 }] });
-      // Schedule shopping list notification
-      if (settings.notifications.types.shoppingList) {
-        const [hour, minute] = settings.notifications.time.split(':');
-        const now = new Date();
-        const notifTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(hour), parseInt(minute));
-        if (notifTime < now) notifTime.setDate(notifTime.getDate() + 1); // Next day if time passed
-        LocalNotifications.schedule({
-          notifications: [
-            {
-              id: 1,
-              title: 'Shopping List Reminder',
-              body: 'Check your shopping list today!',
-              schedule: { at: notifTime },
-            },
-          ],
-        });
+    const scheduleNotifications = async () => {
+      if (settings.notifications.enabled) {
+        try {
+          // Request notification permissions
+          await LocalNotifications.requestPermissions();
+          
+          // Cancel previous notifications
+          await LocalNotifications.cancel({ notifications: [{ id: 1 }, { id: 2 }] });
+          
+          // Schedule shopping list notification
+          if (settings.notifications.types.shoppingList) {
+            const [hour, minute] = settings.notifications.time.split(':');
+            const now = new Date();
+            const notifTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(hour), parseInt(minute));
+            if (notifTime < now) notifTime.setDate(notifTime.getDate() + 1); // Next day if time passed
+            await LocalNotifications.schedule({
+              notifications: [
+                {
+                  id: 1,
+                  title: 'Shopping List Reminder',
+                  body: 'Check your shopping list today!',
+                  schedule: { at: notifTime },
+                },
+              ],
+            });
+          }
+          // Schedule meal plan notification
+          if (settings.notifications.types.mealPlan) {
+            const [hour, minute] = settings.notifications.time.split(':');
+            const now = new Date();
+            const notifTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(hour), parseInt(minute));
+            if (notifTime < now) notifTime.setDate(notifTime.getDate() + 1);
+            await LocalNotifications.schedule({
+              notifications: [
+                {
+                  id: 2,
+                  title: 'Meal Plan Reminder',
+                  body: 'Review your meal plan for today!',
+                  schedule: { at: notifTime },
+                },
+              ],
+            });
+          }
+        } catch (error) {
+          console.error('Error scheduling notifications:', error);
+        }
+      } else {
+        try {
+          // Cancel all notifications if disabled
+          await LocalNotifications.cancel({ notifications: [{ id: 1 }, { id: 2 }] });
+        } catch (error) {
+          console.error('Error canceling notifications:', error);
+        }
       }
-      // Schedule meal plan notification
-      if (settings.notifications.types.mealPlan) {
-        const [hour, minute] = settings.notifications.time.split(':');
-        const now = new Date();
-        const notifTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(hour), parseInt(minute));
-        if (notifTime < now) notifTime.setDate(notifTime.getDate() + 1);
-        LocalNotifications.schedule({
-          notifications: [
-            {
-              id: 2,
-              title: 'Meal Plan Reminder',
-              body: 'Review your meal plan for today!',
-              schedule: { at: notifTime },
-            },
-          ],
-        });
-      }
-    } else {
-      // Cancel all notifications if disabled
-      LocalNotifications.cancel({ notifications: [{ id: 1 }, { id: 2 }] });
-    }
+    };
+    
+    scheduleNotifications();
   }, [settings.notifications]);
 
   // Log tab change
@@ -356,6 +383,7 @@ const App: React.FC = () => {
             mealPlan={mealPlan}
             setMealPlan={setMealPlan}
             inventory={inventory}
+            setInventory={setInventory}
             addToShoppingList={(items) => {
               const newItems = items.map(i => ({ id: Math.random().toString(36).substr(2,9), item: i, category: 'Manual', checked: false }));
               setShoppingList(prev => [...prev, ...newItems]);
@@ -405,6 +433,7 @@ const App: React.FC = () => {
                 onAddToPlan={handleAddToPlan} 
                 onSaveRecipe={handleSaveRecipe}
                 inventory={inventory}
+                setInventory={setInventory}
                 ratings={ratings}
                 onRate={handleAddRating}
                 savedRecipes={savedRecipes}

@@ -9,6 +9,7 @@ interface RecipeFinderProps {
     onAddToPlan: (recipe: StructuredRecipe) => void;
     onSaveRecipe: (recipe: StructuredRecipe) => void;
     inventory: PantryItem[];
+    setInventory: React.Dispatch<React.SetStateAction<PantryItem[]>>;
     ratings: RecipeRating[];
     onRate: (rating: RecipeRating) => void;
     savedRecipes: SavedRecipe[];
@@ -16,7 +17,7 @@ interface RecipeFinderProps {
     setPersistedResult?: (result: RecipeSearchResult | null) => void;
 }
 
-export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, inventory, ratings, onRate, savedRecipes, persistedResult, setPersistedResult }) => {
+export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, inventory, setInventory, ratings, onRate, savedRecipes, persistedResult, setPersistedResult }) => {
     const [activeView, setActiveView] = useState<'search' | 'saved'>('search');
   
     const [specificQuery, setSpecificQuery] = useState('');
@@ -28,6 +29,28 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [strictMode, setStrictMode] = useState(false);
   
     // Use persistedResult if available
+  
+    const handleRecipeMade = (recipe: StructuredRecipe) => {
+      // Parse ingredients and remove matching items from inventory
+      const updatedInventory = [...inventory];
+      
+      recipe.ingredients.forEach(ingredient => {
+        const ingredientLower = ingredient.toLowerCase();
+        // Find matching inventory item
+        const matchingIndex = updatedInventory.findIndex(item => 
+          ingredientLower.includes(item.item.toLowerCase()) || 
+          item.item.toLowerCase().includes(ingredientLower.split(/\d+/)[0].trim())
+        );
+        
+        if (matchingIndex !== -1) {
+          updatedInventory.splice(matchingIndex, 1);
+        }
+      });
+      
+      setInventory(updatedInventory);
+      setShowRecipeModal(false);
+      alert(`✓ Ingredients removed from inventory!`);
+    };
     const [result, setResult] = useState<RecipeSearchResult | null>(persistedResult || null);
     const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
     const [showRecipeModal, setShowRecipeModal] = useState(false);
@@ -369,9 +392,14 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                 </ol>
                             </div>
                         </div>
-                        <button className="sticky bottom-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-b-2xl flex items-center justify-center hover:bg-red-500 transition-all" onClick={() => setShowRecipeModal(false)}>
-                            CLOSE &times;
-                        </button>
+                        <div className="sticky bottom-0 z-10 w-full flex gap-2 p-4 bg-theme-secondary rounded-b-2xl">
+                          <button className="flex-1 py-3 text-lg font-bold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all" onClick={() => handleRecipeMade(modalRecipe)}>
+                            ✓ Made
+                          </button>
+                          <button className="flex-1 py-3 text-lg font-bold text-white bg-[var(--accent-color)] rounded-lg hover:bg-red-500 transition-all" onClick={() => setShowRecipeModal(false)}>
+                            Close
+                          </button>
+                        </div>
                     </div>
                 </div>
             )}
