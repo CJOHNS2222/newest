@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig'; // Adjust path if needed
 import { PantryScanner } from './components/PantryScanner';
 import { RecipeFinder } from './components/RecipeFinder';
@@ -43,11 +43,20 @@ const App: React.FC = () => {
   const [showHousehold, setShowHousehold] = useState(false);
 
   // Data States
-  const [inventory, setInventory] = useState<PantryItem[]>([]);
+  const [inventory, setInventory] = useState<PantryItem[]>(() => {
+    const saved = localStorage.getItem('inventory');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
+  const [shoppingList, setShoppingList] = useState<ShoppingItem[]>(() => {
+    const saved = localStorage.getItem('shoppingList');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
+  const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>(() => {
+    const saved = localStorage.getItem('savedRecipes');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const [ratings, setRatings] = useState<RecipeRating[]>(() => {
     const saved = localStorage.getItem('ratings');
@@ -104,16 +113,8 @@ const App: React.FC = () => {
 
   // Persistence
   useEffect(() => { localStorage.setItem('user', JSON.stringify(user)); }, [user]);
-  useEffect(() => {
-    if (!user || !household?.id) return;
-    const unsubscribe = onSnapshot(doc(db, "households", household.id), (docSnap) => {
-      const data = docSnap.data();
-      if (data && data.inventory) {
-        setInventory(data.inventory);
-      }
-    });
-    return () => unsubscribe();
-  }, [user, household?.id]);
+  
+  // Firebase sync for household data
   useEffect(() => {
     if (!user || !household?.id) return;
     const unsubscribe = onSnapshot(doc(db, "households", household.id), (docSnap) => {
@@ -122,13 +123,45 @@ const App: React.FC = () => {
         if (data.inventory) setInventory(data.inventory);
         if (data.shoppingList) setShoppingList(data.shoppingList);
         if (data.savedRecipes) setSavedRecipes(data.savedRecipes);
+        if (data.ratings) setRatings(data.ratings);
         if (data.mealPlan) setMealPlan(data.mealPlan);
       }
     });
     return () => unsubscribe();
   }, [user, household?.id]);
+
+  // Local storage persistence
+  useEffect(() => { localStorage.setItem('inventory', JSON.stringify(inventory)); }, [inventory]);
+  useEffect(() => { localStorage.setItem('shoppingList', JSON.stringify(shoppingList)); }, [shoppingList]);
+  useEffect(() => { localStorage.setItem('savedRecipes', JSON.stringify(savedRecipes)); }, [savedRecipes]);
+  useEffect(() => { localStorage.setItem('ratings', JSON.stringify(ratings)); }, [ratings]);
   useEffect(() => { localStorage.setItem('mealPlan', JSON.stringify(mealPlan)); }, [mealPlan]);
   useEffect(() => { localStorage.setItem('household', JSON.stringify(household)); }, [household]);
+
+  // Firebase sync for changes to inventory, recipes, shopping list, meal plan, and ratings
+  useEffect(() => {
+    if (!household?.id) return;
+    
+    const updateFirebase = async () => {
+      try {
+        await updateDoc(doc(db, 'households', household.id), {
+          inventory,
+          shoppingList,
+          savedRecipes,
+          ratings,
+          mealPlan,
+          updatedAt: new Date().toISOString()
+        });
+      } catch (error) {
+        console.warn('Failed to sync to Firebase:', error);
+        // Data is still saved in localStorage
+      }
+    };
+
+    // Debounce updates to avoid too many Firebase writes
+    const timer = setTimeout(updateFirebase, 1000);
+    return () => clearTimeout(timer);
+  }, [inventory, shoppingList, savedRecipes, ratings, mealPlan, household?.id]);
 
   const handleLogin = async (loggedInUser: User) => {
     setUser(loggedInUser);

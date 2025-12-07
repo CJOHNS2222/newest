@@ -181,28 +181,50 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
           <div className="space-y-2">
             {household.members.map((member) => (
               <div key={member.id} className="flex items-center justify-between bg-[#2A0A10] p-3 rounded-lg border border-red-900/30">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-1">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
                     member.email === user.email ? 'bg-amber-500 text-[#2A0A10]' : 'bg-red-900/50 text-red-200'
                   }`}>
                     {member.name.charAt(0).toUpperCase()}
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <div className="text-sm font-medium text-white flex items-center gap-2">
                       {member.name} 
                       {member.email === user.email && <span className="text-[10px] bg-amber-500/20 text-amber-500 px-1.5 rounded">YOU</span>}
+                      {member.role === 'Admin' && <span className="text-[10px] bg-red-900/30 text-red-300 px-1.5 rounded">ADMIN</span>}
                     </div>
                     <div className="text-xs text-red-200/50">{member.role} • {member.status}</div>
                   </div>
                 </div>
-                {member.email !== user.email && (
-                  <button 
-                    onClick={() => removeMember(member.id)}
-                    className="text-red-900/50 hover:text-red-400 p-2"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+                <div className="flex gap-2">
+                  {/* Admin can remove other members */}
+                  {user.email === household.members.find(m => m.role === 'Admin')?.email && member.email !== user.email && (
+                    <button 
+                      onClick={() => {
+                        if (confirm(`Remove ${member.name} from household?`)) {
+                          removeMember(member.id);
+                        }
+                      }}
+                      className="text-red-900/50 hover:text-red-400 p-2 transition-colors"
+                      title="Remove member"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                  {/* Member can leave household */}
+                  {member.email === user.email && member.role !== 'Admin' && (
+                    <button 
+                      onClick={() => {
+                        if (confirm('Leave this household? You can rejoin if invited again.')) {
+                          removeMember(member.id);
+                        }
+                      }}
+                      className="text-xs bg-red-900/30 hover:bg-red-900/50 text-red-300 px-2 py-1 rounded transition-colors"
+                    >
+                      Leave
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
