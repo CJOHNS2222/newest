@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, onSnapshot, collection, addDoc, Timestamp, getDocs, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, collection, addDoc, Timestamp, getDocs, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebaseConfig'; // Adjust path if needed
 import { App as CapacitorApp } from '@capacitor/app';
 import { PantryScanner } from './components/PantryScanner';
@@ -415,6 +415,14 @@ const App: React.FC = () => {
   const handleLogin = async (loggedInUser: User) => {
     setUser(loggedInUser);
     
+    // Record user login in Firestore
+    const userRef = doc(db, "users", loggedInUser.id);
+    setDoc(userRef, {
+        name: loggedInUser.name,
+        email: loggedInUser.email,
+        lastLogin: serverTimestamp()
+    }, { merge: true });
+    
     // Get or create household for the user
     const userHousehold = await getOrCreateHousehold(loggedInUser);
     if (userHousehold) {
@@ -479,6 +487,27 @@ const App: React.FC = () => {
 
   const handleAddRating = (rating: RecipeRating) => {
     setRatings(prev => [rating, ...prev]);
+    
+    // Store the rating in Firestore
+    const saveRating = async () => {
+      try {
+        await addDoc(collection(db, "ratings"), {
+          recipeTitle: rating.recipeTitle,
+          rating: rating.rating,
+          comment: rating.comment,
+          userName: rating.userName,
+          userAvatar: rating.userAvatar || null,
+          date: rating.date,
+          userId: user?.id,
+          createdAt: serverTimestamp()
+        });
+        console.log('Rating saved to Firestore:', rating.recipeTitle);
+      } catch (error) {
+        console.error('Failed to save rating to Firestore:', error);
+      }
+    };
+    
+    saveRating();
   };
 
   // Notification Scheduling
