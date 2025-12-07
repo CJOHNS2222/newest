@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, collection, addDoc, Timestamp, getDocs, setDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig'; // Adjust path if needed
+import { App as CapacitorApp } from '@capacitor/app';
 import { PantryScanner } from './components/PantryScanner';
 import { RecipeFinder } from './components/RecipeFinder';
 import { MealPlanner } from './components/MealPlanner';
@@ -146,6 +147,88 @@ const App: React.FC = () => {
     };
     saveUser();
   }, [user?.id]);
+
+  // Handle household invite from email link
+  useEffect(() => {
+    if (!user) return; // Wait for user to be logged in
+
+    // Check for invite parameter in URL
+    const params = new URLSearchParams(window.location.search);
+    const inviteToken = params.get('invite');
+
+    if (inviteToken) {
+      try {
+        // Decode the base64 email
+        const invitedEmail = Buffer.from(inviteToken, 'base64').toString('utf-8');
+        
+        console.log('Processing household invite for:', invitedEmail);
+
+        // If user email matches the invite, auto-join their household
+        if (invitedEmail.toLowerCase() === user.email.toLowerCase() && household?.id) {
+          // User is already in the household (since they logged in and household was loaded)
+          console.log('User already part of household:', household.name);
+          
+          // Show a message that they've been added
+          localStorage.setItem('inviteProcessed', 'true');
+          
+          // Clean up the URL parameter
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (invitedEmail.toLowerCase() === user.email.toLowerCase()) {
+          // User is invited but needs to join
+          console.log('Invite processed - user can now join household');
+          localStorage.setItem('inviteEmail', invitedEmail);
+          localStorage.setItem('pendingInvite', 'true');
+          
+          // Clean up the URL parameter
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } catch (error) {
+        console.error('Error processing invite:', error);
+      }
+    }
+  }, [user, household?.id]);
+
+  // Handle deep links from Capacitor App (mobile app opens from email link)
+  useEffect(() => {
+    if (!user) return;
+
+    const setupDeepLinkListener = async () => {
+      try {
+        CapacitorApp.addListener('appUrlOpen', (data: any) => {
+          const slug = data.url.split('.app').pop();
+          if (slug) {
+            // Parse the deep link: smartpantry://invite?email=BASE64
+            const url = new URL('http://localhost' + slug);
+            const inviteToken = url.searchParams.get('email');
+            
+            if (inviteToken) {
+              try {
+                const invitedEmail = Buffer.from(inviteToken, 'base64').toString('utf-8');
+                console.log('Deep link: Processing household invite for:', invitedEmail);
+                
+                if (invitedEmail.toLowerCase() === user.email.toLowerCase()) {
+                  localStorage.setItem('inviteEmail', invitedEmail);
+                  localStorage.setItem('pendingInvite', 'true');
+                  console.log('Invite accepted via deep link');
+                }
+              } catch (error) {
+                console.error('Error processing deep link invite:', error);
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error setting up deep link listener:', error);
+      }
+    };
+
+    setupDeepLinkListener();
+
+    // Cleanup
+    return () => {
+      CapacitorApp.removeAllListeners();
+    };
+  }, [user]);
   
   // Firebase sync for household data
   useEffect(() => {
@@ -158,6 +241,126 @@ const App: React.FC = () => {
     });
     return () => unsubscribe();
   }, [user, household?.id]);
+
+  // Load ratings from Firebase
+  useEffect(() => {
+    if (!user?.id) return;
+    const loadRatings = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "ratings"));
+        const allRatings: RecipeRating[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.ratings && Array.isArray(data.ratings)) {
+            allRatings.push(...data.ratings);
+          }
+        });
+        if (allRatings.length > 0) {
+          console.log('Loaded ratings from Firebase:', allRatings);
+          setRatings(allRatings);
+        }
+      } catch (error) {
+        console.error('Error loading ratings from Firebase:', error);
+      }
+    };
+    loadRatings();
+  }, [user?.id]);
+
+  // Load inventory from Firebase
+  useEffect(() => {
+    if (!user?.id) return;
+    const loadInventory = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "inventory"));
+        const allItems: PantryItem[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.items && Array.isArray(data.items)) {
+            allItems.push(...data.items);
+          }
+        });
+        if (allItems.length > 0) {
+          console.log('Loaded inventory from Firebase:', allItems);
+          setInventory(allItems);
+        }
+      } catch (error) {
+        console.error('Error loading inventory from Firebase:', error);
+      }
+    };
+    loadInventory();
+  }, [user?.id]);
+
+  // Load shopping list from Firebase
+  useEffect(() => {
+    if (!user?.id) return;
+    const loadShoppingList = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "shoppinglist"));
+        const allItems: ShoppingItem[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.items && Array.isArray(data.items)) {
+            allItems.push(...data.items);
+          }
+        });
+        if (allItems.length > 0) {
+          console.log('Loaded shopping list from Firebase:', allItems);
+          setShoppingList(allItems);
+        }
+      } catch (error) {
+        console.error('Error loading shopping list from Firebase:', error);
+      }
+    };
+    loadShoppingList();
+  }, [user?.id]);
+
+  // Load saved recipes from Firebase
+  useEffect(() => {
+    if (!user?.id) return;
+    const loadSavedRecipes = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "savedrecipes"));
+        const allRecipes: SavedRecipe[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.recipes && Array.isArray(data.recipes)) {
+            allRecipes.push(...data.recipes);
+          }
+        });
+        if (allRecipes.length > 0) {
+          console.log('Loaded saved recipes from Firebase:', allRecipes);
+          setSavedRecipes(allRecipes);
+        }
+      } catch (error) {
+        console.error('Error loading saved recipes from Firebase:', error);
+      }
+    };
+    loadSavedRecipes();
+  }, [user?.id]);
+
+  // Load meal plan from Firebase
+  useEffect(() => {
+    if (!user?.id) return;
+    const loadMealPlan = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "mealplan"));
+        const allMeals: DayPlan[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.meals && Array.isArray(data.meals)) {
+            allMeals.push(...data.meals);
+          }
+        });
+        if (allMeals.length > 0) {
+          console.log('Loaded meal plan from Firebase:', allMeals);
+          setMealPlan(allMeals);
+        }
+      } catch (error) {
+        console.error('Error loading meal plan from Firebase:', error);
+      }
+    };
+    loadMealPlan();
+  }, [user?.id]);
 
   // Local storage persistence
   useEffect(() => { localStorage.setItem('inventory', JSON.stringify(inventory)); }, [inventory]);
@@ -178,37 +381,14 @@ const App: React.FC = () => {
       try {
         console.log('Syncing to Firebase for user:', user.id);
         
-        // Update top-level user collections
+        // Add documents to collections
         await Promise.all([
-          updateDoc(doc(db, 'inventory', user.id), { items: inventory, updatedAt: new Date().toISOString() }).catch(() => 
-            setDoc(doc(db, 'inventory', user.id), { items: inventory, userId: user.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-          ),
-          updateDoc(doc(db, 'shoppinglist', user.id), { items: shoppingList, updatedAt: new Date().toISOString() }).catch(() =>
-            setDoc(doc(db, 'shoppinglist', user.id), { items: shoppingList, userId: user.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-          ),
-          updateDoc(doc(db, 'savedrecipes', user.id), { recipes: savedRecipes, updatedAt: new Date().toISOString() }).catch(() =>
-            setDoc(doc(db, 'savedrecipes', user.id), { recipes: savedRecipes, userId: user.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-          ),
-          updateDoc(doc(db, 'ratings', user.id), { ratings: ratings, updatedAt: new Date().toISOString() }).catch(() =>
-            setDoc(doc(db, 'ratings', user.id), { ratings: ratings, userId: user.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-          ),
-          updateDoc(doc(db, 'mealplan', user.id), { meals: mealPlan, updatedAt: new Date().toISOString() }).catch(() =>
-            setDoc(doc(db, 'mealplan', user.id), { meals: mealPlan, userId: user.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-          )
+          addDoc(collection(db, 'inventory'), { items: inventory, userId: user.id, createdAt: Timestamp.now() }),
+          addDoc(collection(db, 'shoppinglist'), { items: shoppingList, userId: user.id, createdAt: Timestamp.now() }),
+          addDoc(collection(db, 'savedrecipes'), { recipes: savedRecipes, userId: user.id, createdAt: Timestamp.now() }),
+          addDoc(collection(db, 'ratings'), { ratings: ratings, userId: user.id, createdAt: Timestamp.now() }),
+          addDoc(collection(db, 'mealplan'), { meals: mealPlan, userId: user.id, createdAt: Timestamp.now() })
         ]);
-        
-        // If user has a household, also sync shared data to household subcollections
-        if (household?.id) {
-          console.log('Syncing household shared data to:', household.id);
-          await Promise.all([
-            updateDoc(doc(db, 'households', household.id, 'sharedInventory', user.id), { items: inventory, updatedAt: new Date().toISOString() }).catch(() =>
-              setDoc(doc(db, 'households', household.id, 'sharedInventory', user.id), { items: inventory, userId: user.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-            ),
-            updateDoc(doc(db, 'households', household.id, 'sharedMealPlan', 'plan'), { meals: mealPlan, updatedAt: new Date().toISOString() }).catch(() =>
-              setDoc(doc(db, 'households', household.id, 'sharedMealPlan', 'plan'), { meals: mealPlan, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-            )
-          ]);
-        }
         
         console.log('Firebase sync successful');
       } catch (error) {
@@ -220,7 +400,7 @@ const App: React.FC = () => {
     // Debounce updates to avoid too many Firebase writes
     const timer = setTimeout(updateFirebase, 1000);
     return () => clearTimeout(timer);
-  }, [inventory, shoppingList, savedRecipes, ratings, mealPlan, user?.id, household?.id]);
+  }, [inventory, shoppingList, savedRecipes, ratings, mealPlan, user?.id]);
 
   const handleLogin = async (loggedInUser: User) => {
     setUser(loggedInUser);
@@ -502,6 +682,9 @@ const App: React.FC = () => {
             <Community 
                 ratings={ratings} 
                 onAddToPlan={handleAddToPlan}
+                setInventory={setInventory}
+                savedRecipes={savedRecipes}
+                onRate={handleAddRating}
             />
         )}
 

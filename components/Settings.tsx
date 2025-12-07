@@ -150,7 +150,7 @@ export const Settings: React.FC<SettingsProps> = ({ settings, setSettings, user,
             value={feedback}
             onChange={e => setFeedback(e.target.value)}
             placeholder="Let us know your thoughts..."
-            className="w-full p-2 border rounded mb-2 resize-none"
+            className="w-full p-2 border rounded mb-2 resize-none bg-black text-white"
             rows={3}
             disabled={sending}
           />

@@ -94,13 +94,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
   const removeMember = async (id: string) => {
     const memberToRemove = household.members.find(m => m.id === id);
     
-    // Update local state
-    setHousehold(prev => ({
-      ...prev,
-      members: prev.members.filter(m => m.id !== id)
-    }));
-
-    // Update Firebase
+    // Update Firebase first
     if (household.id && memberToRemove) {
       try {
         const householdRef = doc(db, 'households', household.id);
@@ -109,14 +103,22 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         await updateDoc(householdRef, {
           members: updatedMembers
         });
-      } catch (error) {
-        console.error('Error removing member from Firebase:', error);
-        // Revert local change on error
+        
+        // Only update local state after Firebase succeeds
         setHousehold(prev => ({
           ...prev,
-          members: [...prev.members, memberToRemove]
+          members: prev.members.filter(m => m.id !== id)
         }));
+      } catch (error) {
+        console.error('Error removing member from Firebase:', error);
+        // Don't update local state on error - leave it as is
       }
+    } else {
+      // Fallback if no Firebase ID (shouldn't happen in normal flow)
+      setHousehold(prev => ({
+        ...prev,
+        members: prev.members.filter(m => m.id !== id)
+      }));
     }
   };
 

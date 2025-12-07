@@ -26,25 +26,26 @@ interface SendHouseholdInvitationRequest {
  * Called from the frontend when a user invites someone to their household
  */
 export const sendHouseholdInvitation = functions.https.onCall(
-  async (data: SendHouseholdInvitationRequest, context) => {
-    try {
-      // Verify the user is authenticated
-      if (!context.auth) {
-        throw new functions.https.HttpsError(
-          'unauthenticated',
-          'User must be authenticated to send invitations'
-        );
-      }
+  (data: any, context: any) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Verify the user is authenticated
+        if (!context.auth) {
+          throw new functions.https.HttpsError(
+            'unauthenticated',
+            'User must be authenticated to send invitations'
+          );
+        }
 
-      const { inviteeEmail, householdName, inviterName } = data;
+        const { inviteeEmail, householdName, inviterName } = data;
 
-      // Validate input
-      if (!inviteeEmail || !householdName || !inviterName) {
-        throw new functions.https.HttpsError(
-          'invalid-argument',
-          'Missing required fields: inviteeEmail, householdName, inviterName'
-        );
-      }
+        // Validate input
+        if (!inviteeEmail || !householdName || !inviterName) {
+          throw new functions.https.HttpsError(
+            'invalid-argument',
+            'Missing required fields: inviteeEmail, householdName, inviterName'
+          );
+        }
 
       // Validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -57,10 +58,12 @@ export const sendHouseholdInvitation = functions.https.onCall(
 
       // Get app URL from environment or use a default
       const appUrl = process.env.APP_URL || 'https://smartpantry.app';
+      const deepLinkScheme = 'smartpantry://'; // Deep link scheme for Android app
 
       // Create invitation link with encoded email
       const inviteToken = Buffer.from(inviteeEmail).toString('base64');
-      const inviteLink = `${appUrl}?invite=${inviteToken}`;
+      const webInviteLink = `${appUrl}?invite=${inviteToken}`;
+      const deepLinkInvite = `${deepLinkScheme}invite?email=${inviteToken}`;
 
       // Send email
       const mailOptions = {
@@ -76,15 +79,18 @@ export const sendHouseholdInvitation = functions.https.onCall(
             <p>SmartPantry helps families manage their shared pantry inventory, plan meals together, and find recipes based on what you have.</p>
             
             <p style="margin: 30px 0;">
-              <a href="${inviteLink}" style="display: inline-block; padding: 12px 30px; background-color: #d97706; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
-                Accept Invitation
+              <a href="${deepLinkInvite}" style="display: inline-block; padding: 12px 30px; background-color: #d97706; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-bottom: 10px;">
+                Open in SmartPantry App
+              </a><br/>
+              <a href="${webInviteLink}" style="display: inline-block; padding: 12px 30px; background-color: #666; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                Open in Browser
               </a>
             </p>
             
-            <p style="color: #666; font-size: 14px;">
-              Or copy this link if the button doesn't work: <br/>
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">
+              Or copy this link if the buttons don't work: <br/>
               <code style="background: #f3f4f6; padding: 10px; display: inline-block; margin-top: 5px; word-break: break-all;">
-                ${inviteLink}
+                ${webInviteLink}
               </code>
             </p>
             
@@ -101,7 +107,8 @@ export const sendHouseholdInvitation = functions.https.onCall(
 
           SmartPantry helps families manage their shared pantry inventory, plan meals together, and find recipes based on what you have.
 
-          Accept the invitation: ${inviteLink}
+          Open in app: ${deepLinkInvite}
+          Or open in browser: ${webInviteLink}
 
           Happy cooking!
           SmartPantry Team
@@ -112,24 +119,25 @@ export const sendHouseholdInvitation = functions.https.onCall(
       const info = await transporter.sendMail(mailOptions);
       console.log('Email sent successfully:', info.messageId);
 
-      return {
-        success: true,
-        message: `Invitation sent to ${inviteeEmail}`,
-        messageId: info.messageId,
-      };
-    } catch (error) {
-      console.error('Error sending invitation email:', error);
+        resolve({
+          success: true,
+          message: `Invitation sent to ${inviteeEmail}`,
+          messageId: info.messageId,
+        });
+      } catch (error) {
+        console.error('Error sending invitation email:', error);
 
-      // Return appropriate error message
-      if (error instanceof functions.https.HttpsError) {
-        throw error;
+        // Return appropriate error message
+        if (error instanceof functions.https.HttpsError) {
+          reject(error);
+        } else {
+          reject(new functions.https.HttpsError(
+            'internal',
+            'Failed to send invitation email. Please try again later.'
+          ));
+        }
       }
-
-      throw new functions.https.HttpsError(
-        'internal',
-        'Failed to send invitation email. Please try again later.'
-      );
-    }
+    });
   }
 );
 
@@ -138,32 +146,32 @@ export const sendHouseholdInvitation = functions.https.onCall(
  * Can be used if you prefer HTTP requests over callable functions
  */
 export const sendHouseholdInvitationHttp = functions.https.onRequest(
-  async (req, res) => {
+  async (request: any, response: any) => {
     // Only allow POST requests
-    if (req.method !== 'POST') {
-      res.status(405).send('Method Not Allowed');
+    if (request.method !== 'POST') {
+      response.status(405).send('Method Not Allowed');
       return;
     }
 
     try {
-      const { inviteeEmail, householdName, inviterName, idToken } = req.body;
+      const { inviteeEmail, householdName, inviterName, idToken } = request.body;
 
       // Verify the ID token
       if (!idToken) {
-        res.status(401).json({ error: 'Missing authentication token' });
+        response.status(401).json({ error: 'Missing authentication token' });
         return;
       }
 
       try {
         await admin.auth().verifyIdToken(idToken);
       } catch {
-        res.status(401).json({ error: 'Invalid or expired token' });
+        response.status(401).json({ error: 'Invalid or expired token' });
         return;
       }
 
       // Validate input
       if (!inviteeEmail || !householdName || !inviterName) {
-        res.status(400).json({
+        response.status(400).json({
           error: 'Missing required fields: inviteeEmail, householdName, inviterName',
         });
         return;
@@ -172,7 +180,7 @@ export const sendHouseholdInvitationHttp = functions.https.onRequest(
       // Validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(inviteeEmail)) {
-        res.status(400).json({ error: 'Invalid email address' });
+        response.status(400).json({ error: 'Invalid email address' });
         return;
       }
 
@@ -220,14 +228,14 @@ export const sendHouseholdInvitationHttp = functions.https.onRequest(
       const info = await transporter.sendMail(mailOptions);
       console.log('Email sent successfully:', info.messageId);
 
-      res.status(200).json({
+      response.status(200).json({
         success: true,
         message: `Invitation sent to ${inviteeEmail}`,
         messageId: info.messageId,
       });
     } catch (error) {
       console.error('Error sending invitation:', error);
-      res.status(500).json({
+      response.status(500).json({
         error: 'Failed to send invitation email. Please try again later.',
       });
     }
