@@ -14,6 +14,7 @@ import { ChefHat, ShoppingBasket, CalendarDays, UtensilsCrossed, Users, Sun, Moo
 import { User, PantryItem, DayPlan, StructuredRecipe, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult } from './types';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { getAnalytics, logEvent } from 'firebase/analytics';
+import { getOrCreateHousehold, joinHousehold } from './services/householdService';
 
 enum Tab {
   PANTRY = 'PANTRY',
@@ -57,7 +58,7 @@ const App: React.FC = () => {
 
   const [household, setHousehold] = useState<Household>(() => {
     const saved = localStorage.getItem('household');
-    return saved ? JSON.parse(saved) : { id: 'h1', name: 'My Family', members: [] };
+    return saved ? JSON.parse(saved) : { id: '', name: '', members: [] };
   });
 
   const [settings, setSettings] = useState({
@@ -129,23 +130,28 @@ const App: React.FC = () => {
   useEffect(() => { localStorage.setItem('mealPlan', JSON.stringify(mealPlan)); }, [mealPlan]);
   useEffect(() => { localStorage.setItem('household', JSON.stringify(household)); }, [household]);
 
-  const handleLogin = (loggedInUser: User) => {
+  const handleLogin = async (loggedInUser: User) => {
     setUser(loggedInUser);
-    setHousehold(prev => {
-        if (!prev.members.find(m => m.email === loggedInUser.email)) {
-             return {
-                 ...prev,
-                 members: [...prev.members, {
-                     id: loggedInUser.id,
-                     name: loggedInUser.name,
-                     email: loggedInUser.email,
-                     role: 'Admin',
-                     status: 'Active'
-                 }]
-             };
-        }
-        return prev;
-    });
+    
+    // Get or create household for the user
+    const userHousehold = await getOrCreateHousehold(loggedInUser);
+    if (userHousehold) {
+      setHousehold(userHousehold);
+    } else {
+      // Fallback to default household
+      setHousehold({
+        id: `default_${loggedInUser.id}`,
+        name: `${loggedInUser.name}'s Family`,
+        members: [{
+          id: loggedInUser.id,
+          name: loggedInUser.name,
+          email: loggedInUser.email,
+          role: 'Admin',
+          status: 'Active'
+        }]
+      });
+    }
+
     if (!loggedInUser.hasSeenTutorial) setShowTutorial(true);
 
     // Log login event

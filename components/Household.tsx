@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { User, Household, Member } from '../types';
 import { Users, Mail, Plus, X, UserCircle2, Send } from 'lucide-react';
 import { sendHouseholdInvitation } from '../services/emailService';
+import { addMemberToHousehold } from '../services/householdService';
 import { db } from '../firebaseConfig';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, deleteField } from 'firebase/firestore';
 
 interface HouseholdManagerProps {
   user: User;
@@ -54,29 +55,28 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
         user.displayName || user.email
       );
 
-      // Save to local state immediately
+      // Save to Firebase first
+      if (household.id) {
+        try {
+          await addMemberToHousehold(household.id, newMember);
+        } catch (firestoreError) {
+          console.error('Error saving to Firebase:', firestoreError);
+          throw firestoreError;
+        }
+      }
+
+      // Update local state after successful Firebase save
       setHousehold(prev => ({
         ...prev,
         members: [...prev.members, newMember]
       }));
-
-      // Save to Firestore
-      if (household.id) {
-        try {
-          await updateDoc(doc(db, 'households', household.id), {
-            members: arrayUnion(newMember)
-          });
-        } catch (firestoreError) {
-          console.warn('Could not save to Firestore:', firestoreError);
-        }
-      }
 
       setInviteEmail('');
       setInviteMessage({
         type: 'success',
         text: emailResult.success 
           ? `Invitation sent to ${inviteEmail}` 
-          : `Member added locally. Email: ${emailResult.message}`
+          : `Member added. Email delivery status: ${emailResult.message}`
       });
 
       // Clear message after 3 seconds
@@ -91,11 +91,33 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
     }
   };
 
-  const removeMember = (id: string) => {
+  const removeMember = async (id: string) => {
+    const memberToRemove = household.members.find(m => m.id === id);
+    
+    // Update local state
     setHousehold(prev => ({
       ...prev,
       members: prev.members.filter(m => m.id !== id)
     }));
+
+    // Update Firebase
+    if (household.id && memberToRemove) {
+      try {
+        const householdRef = doc(db, 'households', household.id);
+        // Remove by filtering
+        const updatedMembers = household.members.filter(m => m.id !== id);
+        await updateDoc(householdRef, {
+          members: updatedMembers
+        });
+      } catch (error) {
+        console.error('Error removing member from Firebase:', error);
+        // Revert local change on error
+        setHousehold(prev => ({
+          ...prev,
+          members: [...prev.members, memberToRemove]
+        }));
+      }
+    }
   };
 
   return (
