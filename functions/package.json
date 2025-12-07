@@ -1,10 +1,9 @@
 {
-  "name": "smartpantry-functions",
-  "version": "1.0.0",
-  "description": "Firebase Cloud Functions for SmartPantry",
-  "main": "lib/index.js",
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
   "scripts": {
     "build": "tsc",
+    "lint": "eslint . --ext .ts --ignore-pattern lib/",
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "start": "npm run shell",
@@ -14,6 +13,7 @@
   "engines": {
     "node": "20"
   },
+  "main": "lib/index.js",
   "dependencies": {
     "firebase-admin": "^12.0.0",
     "firebase-functions": "^5.0.0",
@@ -21,6 +21,13 @@
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
+    "@types/nodemailer": "^7.0.4",
+    "@typescript-eslint/eslint-plugin": "^8.48.1",
+    "@typescript-eslint/parser": "^8.48.1",
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.4.1",
     "typescript": "^5.3.3"
-  }
+  },
+  "private": true
 }
