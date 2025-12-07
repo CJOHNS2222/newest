@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig'; // Adjust path if needed
 import { PantryScanner } from './components/PantryScanner';
 import { RecipeFinder } from './components/RecipeFinder';
@@ -128,18 +128,32 @@ const App: React.FC = () => {
   // Persistence
   useEffect(() => { localStorage.setItem('user', JSON.stringify(user)); }, [user]);
   
+  // Save user to users collection
+  useEffect(() => {
+    if (!user?.id) return;
+    const saveUser = async () => {
+      try {
+        await setDoc(doc(db, 'users', user.id), {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          provider: user.provider,
+          lastLogin: new Date().toISOString()
+        }, { merge: true });
+      } catch (error) {
+        console.error('Failed to save user to Firebase:', error);
+      }
+    };
+    saveUser();
+  }, [user?.id]);
+  
   // Firebase sync for household data
   useEffect(() => {
     if (!user || !household?.id) return;
     const unsubscribe = onSnapshot(doc(db, "households", household.id), (docSnap) => {
       const data = docSnap.data();
       if (data) {
-        // Only update from Firebase if the data is different from local (prevent overwriting unsaved changes)
-        if (data.inventory && JSON.stringify(data.inventory) !== JSON.stringify(inventory)) setInventory(data.inventory);
-        if (data.shoppingList && JSON.stringify(data.shoppingList) !== JSON.stringify(shoppingList)) setShoppingList(data.shoppingList);
-        if (data.savedRecipes && JSON.stringify(data.savedRecipes) !== JSON.stringify(savedRecipes)) setSavedRecipes(data.savedRecipes);
-        if (data.ratings && JSON.stringify(data.ratings) !== JSON.stringify(ratings)) setRatings(data.ratings);
-        if (data.mealPlan) setMealPlan(data.mealPlan);
+        // Update household members info
       }
     });
     return () => unsubscribe();
@@ -155,20 +169,50 @@ const App: React.FC = () => {
 
   // Firebase sync for changes to inventory, recipes, shopping list, meal plan, and ratings
   useEffect(() => {
-    if (!household?.id) return;
+    if (!user?.id) {
+      console.log('Skipping Firebase sync: no user ID');
+      return;
+    }
     
     const updateFirebase = async () => {
       try {
-        await updateDoc(doc(db, 'households', household.id), {
-          inventory,
-          shoppingList,
-          savedRecipes,
-          ratings,
-          mealPlan,
-          updatedAt: new Date().toISOString()
-        });
+        console.log('Syncing to Firebase for user:', user.id);
+        
+        // Update top-level user collections
+        await Promise.all([
+          updateDoc(doc(db, 'inventory', user.id), { items: inventory, updatedAt: new Date().toISOString() }).catch(() => 
+            setDoc(doc(db, 'inventory', user.id), { items: inventory, userId: user.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+          ),
+          updateDoc(doc(db, 'shoppinglist', user.id), { items: shoppingList, updatedAt: new Date().toISOString() }).catch(() =>
+            setDoc(doc(db, 'shoppinglist', user.id), { items: shoppingList, userId: user.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+          ),
+          updateDoc(doc(db, 'savedrecipes', user.id), { recipes: savedRecipes, updatedAt: new Date().toISOString() }).catch(() =>
+            setDoc(doc(db, 'savedrecipes', user.id), { recipes: savedRecipes, userId: user.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+          ),
+          updateDoc(doc(db, 'ratings', user.id), { ratings: ratings, updatedAt: new Date().toISOString() }).catch(() =>
+            setDoc(doc(db, 'ratings', user.id), { ratings: ratings, userId: user.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+          ),
+          updateDoc(doc(db, 'mealplan', user.id), { meals: mealPlan, updatedAt: new Date().toISOString() }).catch(() =>
+            setDoc(doc(db, 'mealplan', user.id), { meals: mealPlan, userId: user.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+          )
+        ]);
+        
+        // If user has a household, also sync shared data to household subcollections
+        if (household?.id) {
+          console.log('Syncing household shared data to:', household.id);
+          await Promise.all([
+            updateDoc(doc(db, 'households', household.id, 'sharedInventory', user.id), { items: inventory, updatedAt: new Date().toISOString() }).catch(() =>
+              setDoc(doc(db, 'households', household.id, 'sharedInventory', user.id), { items: inventory, userId: user.id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+            ),
+            updateDoc(doc(db, 'households', household.id, 'sharedMealPlan', 'plan'), { meals: mealPlan, updatedAt: new Date().toISOString() }).catch(() =>
+              setDoc(doc(db, 'households', household.id, 'sharedMealPlan', 'plan'), { meals: mealPlan, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+            )
+          ]);
+        }
+        
+        console.log('Firebase sync successful');
       } catch (error) {
-        console.warn('Failed to sync to Firebase:', error);
+        console.error('Failed to sync to Firebase:', error);
         // Data is still saved in localStorage
       }
     };
@@ -176,7 +220,7 @@ const App: React.FC = () => {
     // Debounce updates to avoid too many Firebase writes
     const timer = setTimeout(updateFirebase, 1000);
     return () => clearTimeout(timer);
-  }, [inventory, shoppingList, savedRecipes, ratings, mealPlan, household?.id]);
+  }, [inventory, shoppingList, savedRecipes, ratings, mealPlan, user?.id, household?.id]);
 
   const handleLogin = async (loggedInUser: User) => {
     setUser(loggedInUser);
@@ -184,8 +228,10 @@ const App: React.FC = () => {
     // Get or create household for the user
     const userHousehold = await getOrCreateHousehold(loggedInUser);
     if (userHousehold) {
+      console.log('Household retrieved/created:', userHousehold.id);
       setHousehold(userHousehold);
     } else {
+      console.warn('Failed to get/create household for user');
       // Fallback to default household
       setHousehold({
         id: `default_${loggedInUser.id}`,
