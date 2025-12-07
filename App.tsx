@@ -63,7 +63,10 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [mealPlan, setMealPlan] = useState<DayPlan[]>([]);
+  const [mealPlan, setMealPlan] = useState<DayPlan[]>(() => {
+    const saved = localStorage.getItem('mealPlan');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const [household, setHousehold] = useState<Household>(() => {
     const saved = localStorage.getItem('household');
@@ -131,10 +134,11 @@ const App: React.FC = () => {
     const unsubscribe = onSnapshot(doc(db, "households", household.id), (docSnap) => {
       const data = docSnap.data();
       if (data) {
-        if (data.inventory) setInventory(data.inventory);
-        if (data.shoppingList) setShoppingList(data.shoppingList);
-        if (data.savedRecipes) setSavedRecipes(data.savedRecipes);
-        if (data.ratings) setRatings(data.ratings);
+        // Only update from Firebase if the data is different from local (prevent overwriting unsaved changes)
+        if (data.inventory && JSON.stringify(data.inventory) !== JSON.stringify(inventory)) setInventory(data.inventory);
+        if (data.shoppingList && JSON.stringify(data.shoppingList) !== JSON.stringify(shoppingList)) setShoppingList(data.shoppingList);
+        if (data.savedRecipes && JSON.stringify(data.savedRecipes) !== JSON.stringify(savedRecipes)) setSavedRecipes(data.savedRecipes);
+        if (data.ratings && JSON.stringify(data.ratings) !== JSON.stringify(ratings)) setRatings(data.ratings);
         if (data.mealPlan) setMealPlan(data.mealPlan);
       }
     });
