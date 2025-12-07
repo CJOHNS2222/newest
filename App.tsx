@@ -362,45 +362,55 @@ const App: React.FC = () => {
     loadMealPlan();
   }, [user?.id]);
 
-  // Local storage persistence
-  useEffect(() => { localStorage.setItem('inventory', JSON.stringify(inventory)); }, [inventory]);
-  useEffect(() => { localStorage.setItem('shoppingList', JSON.stringify(shoppingList)); }, [shoppingList]);
-  useEffect(() => { localStorage.setItem('savedRecipes', JSON.stringify(savedRecipes)); }, [savedRecipes]);
-  useEffect(() => { localStorage.setItem('ratings', JSON.stringify(ratings)); }, [ratings]);
-  useEffect(() => { localStorage.setItem('mealPlan', JSON.stringify(mealPlan)); }, [mealPlan]);
+  // --- Data Persistence ---
+
+  // Local persistence for user, household structure, and ratings
+  useEffect(() => { localStorage.setItem('user', JSON.stringify(user)); }, [user]);
   useEffect(() => { localStorage.setItem('household', JSON.stringify(household)); }, [household]);
+  useEffect(() => { localStorage.setItem('ratings', JSON.stringify(ratings)); }, [ratings]);
 
-  // Firebase sync for changes to inventory, recipes, shopping list, meal plan, and ratings
+  // Firestore real-time listener for household data
   useEffect(() => {
-    if (!user?.id) {
-      console.log('Skipping Firebase sync: no user ID');
-      return;
-    }
+    if (!user || !household?.id) return;
     
-    const updateFirebase = async () => {
-      try {
-        console.log('Syncing to Firebase for user:', user.id);
-        
-        // Add documents to collections
-        await Promise.all([
-          addDoc(collection(db, 'inventory'), { items: inventory, userId: user.id, createdAt: Timestamp.now() }),
-          addDoc(collection(db, 'shoppinglist'), { items: shoppingList, userId: user.id, createdAt: Timestamp.now() }),
-          addDoc(collection(db, 'savedrecipes'), { recipes: savedRecipes, userId: user.id, createdAt: Timestamp.now() }),
-          addDoc(collection(db, 'ratings'), { ratings: ratings, userId: user.id, createdAt: Timestamp.now() }),
-          addDoc(collection(db, 'mealplan'), { meals: mealPlan, userId: user.id, createdAt: Timestamp.now() })
-        ]);
-        
-        console.log('Firebase sync successful');
-      } catch (error) {
-        console.error('Failed to sync to Firebase:', error);
-        // Data is still saved in localStorage
+    // Single listener for all household data
+    const unsubscribe = onSnapshot(doc(db, "households", household.id), (docSnap) => {
+      const data = docSnap.data();
+      if (data) {
+        // Update local state from Firestore, checking for existence to avoid overwriting with undefined
+        if (data.inventory) setInventory(data.inventory);
+        if (data.shoppingList) setShoppingList(data.shoppingList);
+        if (data.savedRecipes) setSavedRecipes(data.savedRecipes);
+        if (data.mealPlan) setMealPlan(data.mealPlan);
       }
-    };
+    });
 
-    // Debounce updates to avoid too many Firebase writes
-    const timer = setTimeout(updateFirebase, 1000);
-    return () => clearTimeout(timer);
-  }, [inventory, shoppingList, savedRecipes, ratings, mealPlan, user?.id]);
+    // Cleanup the listener when the component unmounts or dependencies change
+    return () => unsubscribe();
+  }, [user, household?.id]);
+
+  // Effect to write data back to Firestore
+  useEffect(() => {
+    // Guard against writing initial empty state to Firestore before data is loaded
+    if (!user || !household?.id || mealPlan.length === 0) return;
+
+    const handler = setTimeout(() => {
+      const householdRef = doc(db, "households", household.id);
+      // Merge new data with existing document to prevent overwriting other fields
+      setDoc(householdRef, { 
+        inventory,
+        shoppingList,
+        savedRecipes,
+        mealPlan,
+        // Also persist member updates
+        members: household.members 
+      }, { merge: true })
+        .catch(e => console.error("Error writing to Firestore: ", e));
+    }, 1500); // Debounce saves by 1.5s to reduce writes and cost
+
+    return () => clearTimeout(handler);
+  // This effect runs when any of the main data states change
+  }, [inventory, shoppingList, savedRecipes, mealPlan, household.members]);
 
   const handleLogin = async (loggedInUser: User) => {
     setUser(loggedInUser);
