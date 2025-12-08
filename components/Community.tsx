@@ -1,5 +1,5 @@
-import React from 'react';
-import { Star, Clock, ChefHat, Plus } from 'lucide-react';
+import React, { useState } from 'react';
+import { Star, Clock, ChefHat, Plus, X } from 'lucide-react';
 import { RecipeRating, StructuredRecipe } from '../types';
 
 interface CommunityProps {
@@ -8,6 +8,9 @@ interface CommunityProps {
 }
 
 export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan }) => {
+  const [showModal, setShowModal] = useState(false);
+  const [selectedRecipe, setSelectedRecipe] = useState<{ title: string, comments: RecipeRating[] } | null>(null);
+  
   // Group ratings by recipe title and calculate average
   const recipeStats = ratings.reduce((acc, curr) => {
     if (!acc[curr.recipeTitle]) {
@@ -39,7 +42,11 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan }) =>
            const latestComment = stat.comments[0];
            
            return (
-             <div key={idx} className="bg-theme-secondary rounded-xl border border-theme shadow-lg overflow-hidden group hover:shadow-xl transition-all">
+             <div 
+               key={idx} 
+               className="bg-theme-secondary rounded-xl border border-theme shadow-lg overflow-hidden group hover:shadow-xl transition-all cursor-pointer"
+               onClick={() => { setSelectedRecipe(stat); setShowModal(true); }}
+             >
                 {/* Simulated Image Header */}
                 <div className="h-32 bg-gray-200 relative overflow-hidden">
                     <div className="absolute inset-0 flex items-center justify-center text-theme-secondary opacity-10 font-serif text-4xl font-bold bg-theme-primary">
@@ -72,7 +79,8 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan }) =>
                     )}
                     
                     <button 
-                        onClick={() => {
+                        onClick={(e) => {
+                            e.stopPropagation();
                             // Reconstruct a basic structured recipe to add to plan
                             // Note: In a real app we'd fetch the full details
                             const mockRecipe: StructuredRecipe = {
@@ -100,6 +108,69 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan }) =>
              </div>
         )}
       </div>
+
+      {showModal && selectedRecipe && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowModal(false)}>
+          <div className="bg-theme-primary rounded-2xl shadow-2xl p-0 max-w-lg w-full relative flex flex-col" onClick={e => e.stopPropagation()}>
+            <button className="sticky top-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-t-2xl flex items-center justify-center hover:bg-red-500 transition-all" onClick={() => setShowModal(false)}>
+              CLOSE &times;
+            </button>
+            <div className="overflow-y-auto max-h-[70vh] p-8">
+              <h2 className="text-2xl font-serif font-bold mb-4 text-[var(--accent-color)]">{selectedRecipe.title}</h2>
+              
+              <div className="mb-6">
+                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-3">Community Ratings</h4>
+                <div className="space-y-4">
+                  {selectedRecipe.comments.slice(0, 5).map((comment, i) => (
+                    <div key={i} className="bg-theme-secondary p-4 rounded-lg border border-theme">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-6 h-6 rounded-full bg-[var(--accent-color)] text-[10px] text-white flex items-center justify-center font-bold">
+                          {comment.userName.charAt(0)}
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-theme-secondary">{comment.userName}</span>
+                          <div className="flex items-center gap-1 ml-2">
+                            {[...Array(5)].map((_, j) => (
+                              <Star 
+                                key={j} 
+                                className={`w-3 h-3 ${j < comment.rating ? 'fill-yellow-500 text-yellow-500' : 'text-theme-secondary opacity-30'}`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      {comment.comment && <p className="text-sm text-theme-secondary italic">"{comment.comment}"</p>}
+                      <span className="text-[10px] text-theme-secondary opacity-50">{comment.date}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3 flex-col">
+                <button 
+                  onClick={() => {
+                    const mockRecipe: StructuredRecipe = {
+                      title: selectedRecipe.title,
+                      description: "Community favorite",
+                      ingredients: ["View in RecipeFinder for full details"],
+                      instructions: ["View in RecipeFinder for full instructions"],
+                      cookTime: "30-45m"
+                    };
+                    onAddToPlan(mockRecipe);
+                    setShowModal(false);
+                  }}
+                  className="w-full bg-[var(--accent-color)] text-white font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-5 h-5" /> Add to Schedule
+                </button>
+              </div>
+            </div>
+            <button className="sticky bottom-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-b-2xl flex items-center justify-center hover:bg-red-500 transition-all" onClick={() => setShowModal(false)}>
+              CLOSE &times;
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

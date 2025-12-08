@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection, addDoc, getDocs } from 'firebase/firestore';
 import { db } from './firebaseConfig'; // Adjust path if needed
 import { PantryScanner } from './components/PantryScanner';
 import { RecipeFinder } from './components/RecipeFinder';
@@ -156,6 +156,34 @@ const App: React.FC = () => {
     });
     return () => unsubscribe();
   }, [user, household?.id]);
+  
+  // Listen to all ratings from Firestore (for Community tab - shared across all users)
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'ratings'), (snapshot) => {
+      const allRatings: RecipeRating[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        allRatings.push({
+          id: doc.id,
+          recipeTitle: data.recipeTitle,
+          rating: data.rating,
+          comment: data.comment,
+          userName: data.userName,
+          date: data.date,
+          userAvatar: data.userAvatar
+        } as RecipeRating);
+      });
+      // Update with all ratings from Firestore (whether empty or populated)
+      setRatings(allRatings);
+    }, (error) => {
+      console.error('Error loading ratings from Firestore:', error);
+      // Fall back to localStorage if Firestore fails
+      const saved = localStorage.getItem('ratings');
+      if (saved) setRatings(JSON.parse(saved));
+    });
+    return () => unsubscribe();
+  }, []);
+
   useEffect(() => { localStorage.setItem('mealPlan', JSON.stringify(mealPlan)); }, [mealPlan]);
   useEffect(() => { localStorage.setItem('household', JSON.stringify(household)); }, [household]);
 
@@ -217,8 +245,21 @@ const App: React.FC = () => {
     alert("Recipe saved to favorites!");
   };
 
-  const handleAddRating = (rating: RecipeRating) => {
+  const handleAddRating = async (rating: RecipeRating) => {
+    // Save to local state
     setRatings(prev => [rating, ...prev]);
+    
+    // Save to Firestore (shared database)
+    try {
+      await addDoc(collection(db, 'ratings'), {
+        ...rating,
+        userId: user?.id || 'anonymous',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error saving rating to Firestore:', error);
+      // Rating is still saved locally
+    }
   };
 
   // Notification Scheduling
