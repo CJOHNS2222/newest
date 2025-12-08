@@ -26,6 +26,7 @@ module.exports = {
     "valid-jsdoc": "off",
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/no-unused-vars": "warn",
+    "@typescript-eslint/ban-ts-comment": "off",
   },
   overrides: [
     {
@@ -34,6 +35,12 @@ module.exports = {
         mocha: true,
       },
       rules: {},
+    },
+    {
+      files: [".eslintrc.js"],
+      parserOptions: {
+        project: null,
+      },
     },
   ],
   globals: {},
