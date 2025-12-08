@@ -187,8 +187,9 @@ const App: React.FC = () => {
 
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser);
+    const isNewMember = !household?.members.find(m => m.email === loggedInUser.email);
     setHousehold(prev => {
-        if (!prev.members.find(m => m.email === loggedInUser.email)) {
+        if (isNewMember) {
              return {
                  ...prev,
                  members: [...prev.members, {
@@ -206,6 +207,11 @@ const App: React.FC = () => {
 
     // Log login event
     logEvent(analytics, 'login', { method: loggedInUser.provider });
+    
+    // Log join_group event if this is a new member
+    if (isNewMember && household?.id) {
+      logEvent(analytics, 'join_group', { groupId: household.id, groupName: household.name });
+    }
   };
 
   const handleLogout = () => {
@@ -281,6 +287,7 @@ const App: React.FC = () => {
             },
           ],
         });
+        logEvent(analytics, 'notification_received', { type: 'shopping_list', time: settings.notifications.time });
       }
       // Schedule meal plan notification
       if (settings.notifications.types.mealPlan) {
@@ -298,6 +305,7 @@ const App: React.FC = () => {
             },
           ],
         });
+        logEvent(analytics, 'notification_received', { type: 'meal_plan', time: settings.notifications.time });
       }
     } else {
       // Cancel all notifications if disabled

@@ -4,6 +4,8 @@ import { searchRecipes } from '../services/geminiService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe } from '../types';
 import { fetchRecipeImage } from '../services/imageService';
 import { RecipeRatingUI } from './RecipeRating';
+import { logEvent } from 'firebase/analytics';
+import { analytics } from '../firebaseConfig';
 
 interface RecipeFinderProps {
     onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -69,6 +71,14 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             setResult(data);
             if (setPersistedResult) setPersistedResult(data);
             setLoadingState(LoadingState.SUCCESS);
+            
+            // Log search event
+            logEvent(analytics, 'search', {
+                query: params.query || 'generate_from_pantry',
+                resultCount: data?.recipes?.length || 0,
+                recipeType: recipeType || 'any',
+                restrictions: restrictions || 'none'
+            });
         } catch (error) {
             setLoadingState(LoadingState.ERROR);
         }

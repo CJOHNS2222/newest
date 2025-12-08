@@ -17,6 +17,8 @@ import React, { useState, useEffect } from 'react';
 import { ChefHat, Mail, Chrome } from 'lucide-react';
 import { User } from '../types';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, sendEmailVerification } from 'firebase/auth';
+import { logEvent } from 'firebase/analytics';
+import { analytics } from '../firebaseConfig';
 
 
 
@@ -71,6 +73,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         await sendEmailVerification(user);
+        logEvent(analytics, 'sign_up', { email: user.email, provider: 'email' });
         setSuccess('Signup successful! Please check your email to verify your account.');
         onLogin({
           id: user.uid,
@@ -82,6 +85,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         return;
       } else {
         userCredential = await signInWithEmailAndPassword(auth, email, password);
+        logEvent(analytics, 'login', { email: userCredential.user.email, provider: 'email' });
         setSuccess('Login successful!');
         const user = userCredential.user;
         onLogin({
@@ -108,6 +112,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         // Use popup for web
         const result = await signInWithPopup(auth, googleProvider);
         const user = result.user;
+        logEvent(analytics, 'login', { email: user.email, provider: 'google' });
         onLogin({
           id: user.uid,
           name: user.displayName || user.email?.split('@')[0] || '',
