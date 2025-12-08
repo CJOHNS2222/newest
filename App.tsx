@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { doc, onSnapshot, collection, addDoc, getDocs } from 'firebase/firestore';
-import { db } from './firebaseConfig'; // Adjust path if needed
+import { db, analytics } from './firebaseConfig'; // Adjust path if needed
 import { PantryScanner } from './components/PantryScanner';
 import { RecipeFinder } from './components/RecipeFinder';
 import { MealPlanner } from './components/MealPlanner';
@@ -13,7 +13,7 @@ import { Settings } from './components/Settings';
 import { ChefHat, ShoppingBasket, CalendarDays, UtensilsCrossed, Users, Sun, Moon } from 'lucide-react';
 import { User, PantryItem, DayPlan, StructuredRecipe, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult } from './types';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { getAnalytics, logEvent } from 'firebase/analytics';
+import { logEvent } from 'firebase/analytics';
 
 enum Tab {
   PANTRY = 'PANTRY',
@@ -86,8 +86,6 @@ const App: React.FC = () => {
       theme: { mode: theme, accentColor: '#4CAF50' },
     };
   });
-
-  const analytics = getAnalytics();
 
   // Apply Theme
   useEffect(() => {
