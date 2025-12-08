@@ -3,10 +3,10 @@ import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {sendEmail} from "./helpers/sendEmail";
 import {getFirestore, FieldValue} from "firebase-admin/firestore";
 
-// Initialize Firestore Admin SDK
-const db = getFirestore();
-
 export const inviteMember = onCall(async (request) => {
+  // Initialize Firestore Admin SDK (lazy initialization)
+  const db = getFirestore();
+  
   // 1. Check if the user is authenticated
   if (!request.auth) {
     throw new HttpsError(

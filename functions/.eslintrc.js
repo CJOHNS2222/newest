@@ -1,33 +1,41 @@
 module.exports = {
-  root: true,
   env: {
     es6: true,
     node: true,
   },
-  extends: [
-    "eslint:recommended",
-    "plugin:import/errors",
-    "plugin:import/warnings",
-    "plugin:import/typescript",
-    "google",
-    "plugin:@typescript-eslint/recommended",
-  ],
   parser: "@typescript-eslint/parser",
   parserOptions: {
-    project: ["tsconfig.json", "tsconfig.dev.json"],
+    ecmaVersion: 2020,
     sourceType: "module",
+    project: "./tsconfig.json",
   },
-  ignorePatterns: [
-    "/lib/**/*", // Ignore built files.
-    "/generated/**/*", // Ignore generated files.
+  extends: [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
   ],
-  plugins: [
-    "@typescript-eslint",
-    "import",
-  ],
+  plugins: ["@typescript-eslint"],
   rules: {
-    "quotes": ["error", "double"],
-    "import/no-unresolved": 0,
-    "indent": ["error", 2],
+    "no-restricted-globals": ["error", "name", "length"],
+    "prefer-arrow-callback": "warn",
+    "quotes": "off",
+    "indent": "off",
+    "linebreak-style": "off",
+    "max-len": "off",
+    "object-curly-spacing": "off",
+    "comma-dangle": "off",
+    "valid-jsdoc": "off",
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-unused-vars": "warn",
   },
+  overrides: [
+    {
+      files: ["**/*.spec.*"],
+      env: {
+        mocha: true,
+      },
+      rules: {},
+    },
+  ],
+  globals: {},
+  ignorePatterns: ["lib/**/*", "node_modules/**/*", "src/dataconnect-admin-generated/**/*"],
 };
