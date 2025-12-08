@@ -8,6 +8,8 @@ interface CommunityProps {
 }
 
 export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan }) => {
+    // List of staple items to ignore in ingredient display
+    const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
   const [showModal, setShowModal] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<{ title: string, comments: RecipeRating[] } | null>(null);
   
@@ -116,54 +118,44 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan }) =>
               CLOSE &times;
             </button>
             <div className="overflow-y-auto max-h-[70vh] p-8">
-              <h2 className="text-2xl font-serif font-bold mb-4 text-[var(--accent-color)]">{selectedRecipe.title}</h2>
-              
+              <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{selectedRecipe.title}</h2>
+              <div className="mb-4">
+                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Ingredients</h4>
+                <ul className="list-disc list-inside text-theme-secondary opacity-80">
+                  {selectedRecipe.comments.length > 0 && selectedRecipe.comments[0].ingredients
+                    ? selectedRecipe.comments[0].ingredients.filter(ing => {
+                        const ingLower = ing.toLowerCase();
+                        return !STAPLES.some(staple => ingLower.includes(staple));
+                      }).map((ing, i) => <li key={i}>{ing}</li>)
+                    : <li>No ingredient details available.</li>
+                  }
+                </ul>
+              </div>
+              <div className="mb-4">
+                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Instructions</h4>
+                <ul className="list-decimal list-inside text-theme-secondary opacity-80">
+                  {selectedRecipe.comments.length > 0 && selectedRecipe.comments[0].instructions
+                    ? selectedRecipe.comments[0].instructions.map((step, i) => <li key={i}>{step}</li>)
+                    : <li>No instructions available.</li>
+                  }
+                </ul>
+              </div>
               <div className="mb-6">
-                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-3">Community Ratings</h4>
-                <div className="space-y-4">
-                  {selectedRecipe.comments.slice(0, 5).map((comment, i) => (
-                    <div key={i} className="bg-theme-secondary p-4 rounded-lg border border-theme">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-6 h-6 rounded-full bg-[var(--accent-color)] text-[10px] text-white flex items-center justify-center font-bold">
-                          {comment.userName.charAt(0)}
-                        </div>
-                        <div>
-                          <span className="text-xs font-bold text-theme-secondary">{comment.userName}</span>
-                          <div className="flex items-center gap-1 ml-2">
-                            {[...Array(5)].map((_, j) => (
-                              <Star 
-                                key={j} 
-                                className={`w-3 h-3 ${j < comment.rating ? 'fill-yellow-500 text-yellow-500' : 'text-theme-secondary opacity-30'}`}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                      {comment.comment && <p className="text-sm text-theme-secondary italic">"{comment.comment}"</p>}
-                      <span className="text-[10px] text-theme-secondary opacity-50">{comment.date}</span>
-                    </div>
+                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Community Comments</h4>
+                <ul className="space-y-2">
+                  {selectedRecipe.comments.map((c, i) => (
+                    <li key={i} className="bg-theme-secondary p-3 rounded-lg border border-theme">
+                      <span className="font-bold text-[var(--accent-color)]">{c.userName || 'Anonymous'}:</span> <span className="italic">{c.comment}</span>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
-
-              <div className="flex gap-3 flex-col">
-                <button 
-                  onClick={() => {
-                    const mockRecipe: StructuredRecipe = {
-                      title: selectedRecipe.title,
-                      description: "Community favorite",
-                      ingredients: ["View in RecipeFinder for full details"],
-                      instructions: ["View in RecipeFinder for full instructions"],
-                      cookTime: "30-45m"
-                    };
-                    onAddToPlan(mockRecipe);
-                    setShowModal(false);
-                  }}
-                  className="w-full bg-[var(--accent-color)] text-white font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2"
-                >
-                  <Plus className="w-5 h-5" /> Add to Schedule
-                </button>
-              </div>
+              <button 
+                onClick={() => { setShowModal(false); onAddToPlan && selectedRecipe.comments[0] && onAddToPlan(selectedRecipe.comments[0].recipe); }}
+                className="w-full bg-[var(--accent-color)] text-white font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2"
+              >
+                <Plus className="w-5 h-5" /> Add to Schedule
+              </button>
             </div>
             <button className="sticky bottom-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-b-2xl flex items-center justify-center hover:bg-red-500 transition-all" onClick={() => setShowModal(false)}>
               CLOSE &times;

@@ -19,10 +19,13 @@ interface RecipeFinderProps {
 }
 
 export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, inventory, ratings, onRate, savedRecipes, persistedResult, setPersistedResult }) => {
+        // List of staple items to ignore
+        const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     const [activeView, setActiveView] = useState<'search' | 'saved'>('search');
   
     const [specificQuery, setSpecificQuery] = useState('');
-    const [restrictions, setRestrictions] = useState('');
+    // Dietary restrictions state
+    const [restrictions, setRestrictions] = useState<string[]>([]);
     const [maxCookTime, setMaxCookTime] = useState<string>('60');
     const [maxIngredients, setMaxIngredients] = useState<string>('10');
     const [recipeType, setRecipeType] = useState<'Snack' | 'Dinner' | 'Dessert' | ''>('');
@@ -62,22 +65,36 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
         try {
             const data = await searchRecipes({
                 ...params,
-                restrictions,
+                restrictions: restrictions.join(','),
                 maxCookTime: parseInt(maxCookTime),
                 maxIngredients: parseInt(maxIngredients),
                 measurementSystem: measurement,
                 type: recipeType
             });
-            setResult(data);
-            if (setPersistedResult) setPersistedResult(data);
+            // Filter results by type (quick meal, dinner, dessert)
+            let filteredRecipes = data.recipes;
+            if (recipeType) {
+                filteredRecipes = filteredRecipes.filter((r: StructuredRecipe) => {
+                    if (!r.type) return true;
+                    return r.type.toLowerCase() === recipeType.toLowerCase();
+                });
+            }
+            // Filter by dietary restrictions
+            if (restrictions.length > 0) {
+                filteredRecipes = filteredRecipes.filter((r: StructuredRecipe) => {
+                    if (!r.dietaryTags) return true;
+                    return restrictions.every(res => r.dietaryTags?.includes(res));
+                });
+            }
+            setResult({ ...data, recipes: filteredRecipes });
+            if (setPersistedResult) setPersistedResult({ ...data, recipes: filteredRecipes });
             setLoadingState(LoadingState.SUCCESS);
-            
             // Log search event
             logEvent(analytics, 'search', {
                 query: params.query || 'generate_from_pantry',
-                resultCount: data?.recipes?.length || 0,
+                resultCount: filteredRecipes?.length || 0,
                 recipeType: recipeType || 'any',
-                restrictions: restrictions || 'none'
+                restrictions: restrictions.join(',') || 'none'
             });
         } catch (error) {
             setLoadingState(LoadingState.ERROR);
@@ -131,29 +148,34 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             <div className="flex items-center gap-3 text-xs font-medium opacity-90">
                                 <span className="bg-black/40 backdrop-blur px-2 py-1 rounded flex items-center gap-1">
                                     <Clock className="w-3 h-3 text-[var(--accent-color)]" /> {recipe.cookTime}
-                                </span>
-                                {ratingInfo && (
-                                    <span className="bg-[var(--accent-color)]/90 px-2 py-1 rounded flex items-center gap-1">
-                                        <Star className="w-3 h-3 fill-white" /> {ratingInfo.avg}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                        {!isSavedView && (
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); onSaveRecipe(recipe); }}
-                                className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all ${isSaved ? 'bg-[var(--accent-color)] text-white' : 'bg-black/30 text-white hover:bg-[var(--accent-color)]'}`}
-                            >
-                                <Heart className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
-                            </button>
-                        )}
-                    </div>
+                                // Filter out staple items from ingredient list
+                                const filteredIngredients = recipe.ingredients.filter(ing => {
+                                    const ingLower = ing.toLowerCase();
+                                    return !STAPLES.some(staple => ingLower.includes(staple));
+                                });
+                                return (
+                                    <div key={recipe.title} className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden group hover:shadow-2xl transition-all mb-6 cursor-pointer" onClick={() => { setModalRecipe(recipe); setShowRecipeModal(true); }}>
+                                        {/* Recipe Image */}
+                                        <div className="h-40 relative bg-gray-200 overflow-hidden">
+                                            ...existing code...
+                                        </div>
 
-            <div className="p-6">
-                {ratingInfo && (
-                    <div className="mb-4 p-3 bg-theme-primary rounded-lg border border-theme flex items-start gap-2">
-                        <div className="min-w-[4px] h-full bg-[var(--accent-color)] rounded-full"></div>
-                        <div>
+                                <div className="p-6">
+                                    ...existing code...
+                                    <div className="grid gap-4 mb-6">
+                                        <div className="bg-theme-primary/50 p-4 rounded-lg">
+                                            <h5 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2 flex items-center gap-2">
+                                                <List className="w-3 h-3" /> Ingredients
+                                            </h5>
+                                            <ul className="text-sm text-theme-secondary opacity-80 space-y-1 list-disc list-inside">
+                                                {filteredIngredients.map((ing, i) => <li key={i}>{ing}</li>)}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    ...existing code...
+                                </div>
+                            </div>
+                         );
                              <div className="text-xs font-bold text-[var(--accent-color)] uppercase mb-0.5">Community Verdict</div>
                              <p className="text-xs italic text-theme-secondary opacity-80">"{ratingInfo.snippet}"</p>
                         </div>
@@ -296,42 +318,62 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     </div>
 
                     {/* Recipe Type Selector & Inputs Row */}
-                    <div className="grid grid-cols-3 gap-3">
-                        <div>
-                            <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Type</label>
-                            <select
-                              value={recipeType}
-                              onChange={e => setRecipeType(e.target.value as 'Snack' | 'Dinner' | 'Dessert' | '')}
-                              className="w-full p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
-                            >
-                              <option value="">Any</option>
-                              <option value="Snack">Quick Snack</option>
-                              <option value="Dinner">Dinner</option>
-                              <option value="Dessert">Dessert</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Time</label>
-                            <div className="relative">
-                                <input
-                                type="number"
-                                value={maxCookTime}
-                                onChange={(e) => setMaxCookTime(e.target.value)}
-                                className="w-16 p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
-                                />
-                                <span className="absolute right-2 top-2.5 opacity-50 text-[10px] font-bold mt-1">MIN</span>
-                            </div>
-                        </div>
-                        <div>
-                            <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Items</label>
-                            <input
-                                type="number"
-                                value={maxIngredients}
-                                onChange={(e) => setMaxIngredients(e.target.value)}
-                                className="w-16 p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
-                            />
-                        </div>
-                    </div>
+                                        <div className="grid grid-cols-4 gap-3">
+                                                <div>
+                                                        <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Type</label>
+                                                        <select
+                                                            value={recipeType}
+                                                            onChange={e => setRecipeType(e.target.value as 'Snack' | 'Dinner' | 'Dessert' | '')}
+                                                            className="w-full p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                                                        >
+                                                            <option value="">Any</option>
+                                                            <option value="Snack">Quick Snack</option>
+                                                            <option value="Dinner">Dinner</option>
+                                                            <option value="Dessert">Dessert</option>
+                                                        </select>
+                                                </div>
+                                                <div>
+                                                        <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Dietary</label>
+                                                        <select
+                                                            multiple
+                                                            value={restrictions}
+                                                            onChange={e => {
+                                                                const opts = Array.from(e.target.selectedOptions).map(opt => opt.value);
+                                                                setRestrictions(opts);
+                                                            }}
+                                                            className="w-full p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm h-20"
+                                                        >
+                                                            <option value="Vegetarian">Vegetarian</option>
+                                                            <option value="Vegan">Vegan</option>
+                                                            <option value="Gluten-Free">Gluten-Free</option>
+                                                            <option value="Dairy-Free">Dairy-Free</option>
+                                                            <option value="Nut-Free">Nut-Free</option>
+                                                            <option value="Low-Carb">Low-Carb</option>
+                                                            <option value="Low-Sugar">Low-Sugar</option>
+                                                        </select>
+                                                </div>
+                                                <div>
+                                                        <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Time</label>
+                                                        <div className="relative">
+                                                                <input
+                                                                type="number"
+                                                                value={maxCookTime}
+                                                                onChange={(e) => setMaxCookTime(e.target.value)}
+                                                                className="w-16 p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                                                                />
+                                                                <span className="absolute right-2 top-2.5 opacity-50 text-[10px] font-bold mt-1">MIN</span>
+                                                        </div>
+                                                </div>
+                                                <div>
+                                                        <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Items</label>
+                                                        <input
+                                                                type="number"
+                                                                value={maxIngredients}
+                                                                onChange={(e) => setMaxIngredients(e.target.value)}
+                                                                className="w-16 p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                                                        />
+                                                </div>
+                                        </div>
 
                     <button
                         type="submit"
@@ -369,7 +411,10 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             <div className="mb-4">
                                 <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Ingredients</h4>
                                 <ul className="list-disc list-inside text-theme-secondary opacity-80">
-                                    {modalRecipe.ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
+                                    {modalRecipe.ingredients.filter(ing => {
+                                        const ingLower = ing.toLowerCase();
+                                        return !STAPLES.some(staple => ingLower.includes(staple));
+                                    }).map((ing, i) => <li key={i}>{ing}</li>)}
                                 </ul>
                             </div>
                             <div className="mb-6">
