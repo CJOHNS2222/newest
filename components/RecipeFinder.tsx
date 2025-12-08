@@ -131,7 +131,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         </div>
                         {!isSavedView && (
                             <button 
-                                onClick={() => onSaveRecipe(recipe)}
+                                onClick={(e) => { e.stopPropagation(); onSaveRecipe(recipe); }}
                                 className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all ${isSaved ? 'bg-[var(--accent-color)] text-white' : 'bg-black/30 text-white hover:bg-[var(--accent-color)]'}`}
                             >
                                 <Heart className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
@@ -172,7 +172,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     </button>
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-theme">
+                <div className="mt-4 pt-4 border-t border-theme" onClick={(e) => e.stopPropagation()}>
                         <RecipeRatingUI recipeTitle={recipe.title} onRate={onRate} />
                 </div>
             </div>
@@ -362,11 +362,25 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                     {modalRecipe.ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
                                 </ul>
                             </div>
-                            <div>
+                            <div className="mb-6">
                                 <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Instructions</h4>
                                 <ol className="list-decimal list-inside text-theme-secondary opacity-80 space-y-1">
                                     {modalRecipe.instructions.map((step, i) => <li key={i}>{step}</li>)}
                                 </ol>
+                            </div>
+                            <div className="flex gap-3 flex-col">
+                                <button 
+                                    onClick={() => { onAddToPlan(modalRecipe); setShowRecipeModal(false); }}
+                                    className="w-full bg-[var(--accent-color)] text-white font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Plus className="w-5 h-5" /> Add to Schedule
+                                </button>
+                                <button 
+                                    onClick={() => { onSaveRecipe(modalRecipe); setShowRecipeModal(false); }}
+                                    className="w-full bg-theme-secondary border border-[var(--accent-color)] text-[var(--accent-color)] font-bold py-3 rounded-xl hover:bg-[var(--accent-color)] hover:text-white transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Heart className="w-5 h-5" /> Mark as Made
+                                </button>
                             </div>
                         </div>
                         <button className="sticky bottom-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-b-2xl flex items-center justify-center hover:bg-red-500 transition-all" onClick={() => setShowRecipeModal(false)}>
