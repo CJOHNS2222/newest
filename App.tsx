@@ -42,31 +42,49 @@ const App: React.FC = () => {
   const [showHousehold, setShowHousehold] = useState(false);
 
   // Data States
-  const [inventory, setInventory] = useState<PantryItem[]>([]);
+  const [inventory, setInventory] = useState<PantryItem[]>(() => {
+    const saved = localStorage.getItem('inventory');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
+  const [shoppingList, setShoppingList] = useState<ShoppingItem[]>(() => {
+    const saved = localStorage.getItem('shoppingList');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
+  const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>(() => {
+    const saved = localStorage.getItem('savedRecipes');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const [ratings, setRatings] = useState<RecipeRating[]>(() => {
     const saved = localStorage.getItem('ratings');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [mealPlan, setMealPlan] = useState<DayPlan[]>([]);
+  const [mealPlan, setMealPlan] = useState<DayPlan[]>(() => {
+    const saved = localStorage.getItem('mealPlan');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const [household, setHousehold] = useState<Household>(() => {
     const saved = localStorage.getItem('household');
     return saved ? JSON.parse(saved) : { id: 'h1', name: 'My Family', members: [] };
   });
 
-  const [settings, setSettings] = useState({
-    notifications: {
-      enabled: true,
-      time: '09:00',
-      types: { shoppingList: true, mealPlan: true },
-    },
-    theme: { mode: theme, accentColor: '#4CAF50' },
+  const [settings, setSettings] = useState(() => {
+    const saved = localStorage.getItem('settings');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    return {
+      notifications: {
+        enabled: true,
+        time: '09:00',
+        types: { shoppingList: true, mealPlan: true },
+      },
+      theme: { mode: theme, accentColor: '#4CAF50' },
+    };
   });
 
   const analytics = getAnalytics();
@@ -80,6 +98,11 @@ const App: React.FC = () => {
       document.documentElement.style.setProperty('--theme-background', settings.theme.backgroundColor);
     }
   }, [settings.theme]);
+
+  // Persist settings to localStorage
+  useEffect(() => {
+    localStorage.setItem('settings', JSON.stringify(settings));
+  }, [settings]);
 
   // Init Meal Plan
   useEffect(() => {
@@ -100,6 +123,13 @@ const App: React.FC = () => {
       setMealPlan(initialPlan);
     }
   }, []);
+
+  // Local storage persistence for all data
+  useEffect(() => { localStorage.setItem('inventory', JSON.stringify(inventory)); }, [inventory]);
+  useEffect(() => { localStorage.setItem('shoppingList', JSON.stringify(shoppingList)); }, [shoppingList]);
+  useEffect(() => { localStorage.setItem('savedRecipes', JSON.stringify(savedRecipes)); }, [savedRecipes]);
+  useEffect(() => { localStorage.setItem('ratings', JSON.stringify(ratings)); }, [ratings]);
+  useEffect(() => { localStorage.setItem('mealPlan', JSON.stringify(mealPlan)); }, [mealPlan]);
 
   // Persistence
   useEffect(() => { localStorage.setItem('user', JSON.stringify(user)); }, [user]);
