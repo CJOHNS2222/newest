@@ -38,7 +38,31 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
     } catch (error) {
       console.error("Error sending invitation:", error);
-      // Here you might want to show an error message to the user
+      // Fallback: try HTTP endpoint with ID token (handles CORS/dev calls)
+      try {
+        const { auth } = await import('../firebaseConfig');
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) throw new Error('No auth token available');
+
+        const resp = await fetch(`https://us-central1-gen-lang-client-0893655267.cloudfunctions.net/inviteMemberHttp`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ email: inviteEmail, householdId: household.id })
+        });
+
+        if (!resp.ok) throw new Error(`HTTP invite failed: ${resp.status}`);
+        const json = await resp.json();
+        if (json?.newMember) {
+          setHousehold(prev => ({ ...prev, members: [...prev.members, json.newMember] }));
+          setInviteEmail('');
+          console.log('Invitation sent via HTTP fallback');
+        }
+      } catch (err) {
+        console.error('Fallback HTTP invite error:', err);
+      }
     } finally {
       setIsInviting(false);
     }

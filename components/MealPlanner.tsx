@@ -10,6 +10,8 @@ interface MealPlannerProps {
 }
 
 export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList }) => {
+    // List of staple items to ignore
+    const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
   const [draggedMeal, setDraggedMeal] = useState<{ dayIndex: number, mealIndex: number } | null>(null);
   const [missingItemsCount, setMissingItemsCount] = useState(0);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
@@ -17,17 +19,17 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
 
   const getMissingIngredients = () => {
     const allNeededIngredients = mealPlan.flatMap(day => 
-        day.meals.flatMap(meal => meal.recipe.ingredients)
+      day.meals.flatMap(meal => meal.recipe.ingredients)
     );
-    
+    // Filter out staple items
     const missing = allNeededIngredients.filter(needed => {
-        const neededLower = needed.toLowerCase();
-        return !inventory.some(pantryItem => 
-            neededLower.includes(pantryItem.item.toLowerCase()) || 
-            pantryItem.item.toLowerCase().includes(neededLower)
-        );
+      const neededLower = needed.toLowerCase();
+      if (STAPLES.some(staple => neededLower.includes(staple))) return false;
+      return !inventory.some(pantryItem => 
+        neededLower.includes(pantryItem.item.toLowerCase()) || 
+        pantryItem.item.toLowerCase().includes(neededLower)
+      );
     });
-
     return [...new Set(missing)];
   };
 

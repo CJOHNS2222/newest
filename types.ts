@@ -96,4 +96,5 @@ export interface Household {
   id: string;
   name: string;
   members: Member[];
+  memberIds?: string[]; // convenience array of member UIDs for fast rule checks
 }

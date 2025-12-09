@@ -24,8 +24,6 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [activeView, setActiveView] = useState<'search' | 'saved'>('search');
   
     const [specificQuery, setSpecificQuery] = useState('');
-    // Dietary restrictions state
-    const [restrictions, setRestrictions] = useState<string[]>([]);
     const [maxCookTime, setMaxCookTime] = useState<string>('60');
     const [maxIngredients, setMaxIngredients] = useState<string>('10');
     const [recipeType, setRecipeType] = useState<'Snack' | 'Dinner' | 'Dessert' | ''>('');
@@ -35,6 +33,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     // Use persistedResult if available
     const [result, setResult] = useState<RecipeSearchResult | null>(persistedResult || null);
     const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
+    const [searchError, setSearchError] = useState<string | null>(null);
     const [showRecipeModal, setShowRecipeModal] = useState(false);
     const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
 
@@ -61,11 +60,12 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const performSearch = async (params: any) => {
         setLoadingState(LoadingState.LOADING);
         setResult(null);
+        setSearchError(null);
         if (setPersistedResult) setPersistedResult(null);
         try {
+            console.debug('Recipe search params:', params);
             const data = await searchRecipes({
                 ...params,
-                restrictions: restrictions.join(','),
                 maxCookTime: parseInt(maxCookTime),
                 maxIngredients: parseInt(maxIngredients),
                 measurementSystem: measurement,
@@ -79,13 +79,6 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     return r.type.toLowerCase() === recipeType.toLowerCase();
                 });
             }
-            // Filter by dietary restrictions
-            if (restrictions.length > 0) {
-                filteredRecipes = filteredRecipes.filter((r: StructuredRecipe) => {
-                    if (!r.dietaryTags) return true;
-                    return restrictions.every(res => r.dietaryTags?.includes(res));
-                });
-            }
             setResult({ ...data, recipes: filteredRecipes });
             if (setPersistedResult) setPersistedResult({ ...data, recipes: filteredRecipes });
             setLoadingState(LoadingState.SUCCESS);
@@ -93,19 +86,20 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             logEvent(analytics, 'search', {
                 query: params.query || 'generate_from_pantry',
                 resultCount: filteredRecipes?.length || 0,
-                recipeType: recipeType || 'any',
-                restrictions: restrictions.join(',') || 'none'
+                recipeType: recipeType || 'any'
             });
-        } catch (error) {
+        } catch (error: any) {
+            console.error('performSearch error:', error);
+            setSearchError(error?.message ? String(error.message) : JSON.stringify(error));
             setLoadingState(LoadingState.ERROR);
         }
     };
 
   const getRatingInfo = (title: string) => {
-      const related = ratings.filter(r => r.recipeTitle.toLowerCase() === title.toLowerCase());
+      const related = ratings.filter(r => !!r?.recipeTitle && r.recipeTitle.toLowerCase() === title.toLowerCase());
       if (related.length === 0) return null;
       
-      const total = related.reduce((a, b) => a + b.rating, 0);
+      const total = related.reduce((a, b) => a + (b?.rating || 0), 0);
       return {
           avg: (total / related.length).toFixed(1),
           count: related.length,
@@ -130,6 +124,11 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             const ratingInfo = getRatingInfo(recipe.title);
             const isSaved = savedRecipes.some(r => r.title === recipe.title);
             const imgUrl = imageUrls[recipe.title] || `https://source.unsplash.com/600x400/?${encodeURIComponent(recipe.title.split(' ').slice(0,2).join(','))},food`;
+            // Filter out staple items from ingredient list
+            const filteredIngredients = recipe.ingredients.filter(ing => {
+                const ingLower = ing.toLowerCase();
+                return !STAPLES.some(staple => ingLower.includes(staple));
+            });
 
             return (
                 <div key={recipe.title} className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden group hover:shadow-2xl transition-all mb-6 cursor-pointer" onClick={() => { setModalRecipe(recipe); setShowRecipeModal(true); }}>
@@ -148,69 +147,45 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                             <div className="flex items-center gap-3 text-xs font-medium opacity-90">
                                 <span className="bg-black/40 backdrop-blur px-2 py-1 rounded flex items-center gap-1">
                                     <Clock className="w-3 h-3 text-[var(--accent-color)]" /> {recipe.cookTime}
-                                // Filter out staple items from ingredient list
-                                const filteredIngredients = recipe.ingredients.filter(ing => {
-                                    const ingLower = ing.toLowerCase();
-                                    return !STAPLES.some(staple => ingLower.includes(staple));
-                                });
-                                return (
-                                    <div key={recipe.title} className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden group hover:shadow-2xl transition-all mb-6 cursor-pointer" onClick={() => { setModalRecipe(recipe); setShowRecipeModal(true); }}>
-                                        {/* Recipe Image */}
-                                        <div className="h-40 relative bg-gray-200 overflow-hidden">
-                                            ...existing code...
-                                        </div>
-
-                                <div className="p-6">
-                                    ...existing code...
-                                    <div className="grid gap-4 mb-6">
-                                        <div className="bg-theme-primary/50 p-4 rounded-lg">
-                                            <h5 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2 flex items-center gap-2">
-                                                <List className="w-3 h-3" /> Ingredients
-                                            </h5>
-                                            <ul className="text-sm text-theme-secondary opacity-80 space-y-1 list-disc list-inside">
-                                                {filteredIngredients.map((ing, i) => <li key={i}>{ing}</li>)}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                    ...existing code...
-                                </div>
+                                </span>
+                                {ratingInfo && (
+                                    <span className="bg-black/40 backdrop-blur px-2 py-1 rounded flex items-center gap-1">
+                                        <Star className="w-3 h-3 text-yellow-400" /> {ratingInfo.avg} ({ratingInfo.count})
+                                    </span>
+                                )}
                             </div>
-                         );
-                             <div className="text-xs font-bold text-[var(--accent-color)] uppercase mb-0.5">Community Verdict</div>
-                             <p className="text-xs italic text-theme-secondary opacity-80">"{ratingInfo.snippet}"</p>
                         </div>
                     </div>
-                )}
 
-                <p className="text-theme-secondary opacity-70 text-sm mb-4 leading-relaxed">{recipe.description}</p>
-                
-                <div className="grid gap-4 mb-6">
-                    <div className="bg-theme-primary/50 p-4 rounded-lg">
-                        <h5 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2 flex items-center gap-2">
-                            <List className="w-3 h-3" /> Ingredients
-                        </h5>
-                        <ul className="text-sm text-theme-secondary opacity-80 space-y-1 list-disc list-inside">
-                            {recipe.ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
-                        </ul>
+                    <div className="p-6">
+                        <p className="text-theme-secondary opacity-70 text-sm mb-4 leading-relaxed">{recipe.description}</p>
+                        <div className="grid gap-4 mb-6">
+                            <div className="bg-theme-primary/50 p-4 rounded-lg">
+                                <h5 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2 flex items-center gap-2">
+                                    <List className="w-3 h-3" /> Ingredients
+                                </h5>
+                                <ul className="text-sm text-theme-secondary opacity-80 space-y-1 list-disc list-inside">
+                                    {filteredIngredients.map((ing, i) => <li key={i}>{ing}</li>)}
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onAddToPlan(recipe); }}
+                                className="flex-1 bg-theme-primary border border-theme hover:border-[var(--accent-color)] text-[var(--accent-color)] font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 hover:bg-[var(--accent-color)] hover:text-white"
+                            >
+                                <Plus className="w-5 h-5" /> Add to Schedule
+                            </button>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-theme" onClick={(e) => e.stopPropagation()}>
+                            <RecipeRatingUI recipeTitle={recipe.title} onRate={onRate} />
+                        </div>
                     </div>
                 </div>
-
-                <div className="flex gap-2">
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); onAddToPlan(recipe); }}
-                        className="flex-1 bg-theme-primary border border-theme hover:border-[var(--accent-color)] text-[var(--accent-color)] font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 hover:bg-[var(--accent-color)] hover:text-white"
-                    >
-                        <Plus className="w-5 h-5" /> Add to Schedule
-                    </button>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-theme" onClick={(e) => e.stopPropagation()}>
-                        <RecipeRatingUI recipeTitle={recipe.title} onRate={onRate} />
-                </div>
-            </div>
-        </div>
-     );
-  };
+            );
+        };
 
   return (
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in">
@@ -332,26 +307,8 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                                             <option value="Dessert">Dessert</option>
                                                         </select>
                                                 </div>
-                                                <div>
-                                                        <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Dietary</label>
-                                                        <select
-                                                            multiple
-                                                            value={restrictions}
-                                                            onChange={e => {
-                                                                const opts = Array.from(e.target.selectedOptions).map(opt => opt.value);
-                                                                setRestrictions(opts);
-                                                            }}
-                                                            className="w-full p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm h-20"
-                                                        >
-                                                            <option value="Vegetarian">Vegetarian</option>
-                                                            <option value="Vegan">Vegan</option>
-                                                            <option value="Gluten-Free">Gluten-Free</option>
-                                                            <option value="Dairy-Free">Dairy-Free</option>
-                                                            <option value="Nut-Free">Nut-Free</option>
-                                                            <option value="Low-Carb">Low-Carb</option>
-                                                            <option value="Low-Sugar">Low-Sugar</option>
-                                                        </select>
-                                                </div>
+                                                {/* Dietary restrictions removed */}
+                                                <div></div>
                                                 <div>
                                                         <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Time</label>
                                                         <div className="relative">
@@ -388,7 +345,10 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
             {loadingState === LoadingState.ERROR && (
                 <div className="p-4 bg-red-900/20 border border-red-500 text-red-400 rounded-xl text-center font-medium">
-                Search failed. Please try again.
+                <div>Search failed. Please try again.</div>
+                {searchError && (
+                    <div className="text-xs mt-2 text-red-300">Error: {searchError}</div>
+                )}
                 </div>
             )}
 

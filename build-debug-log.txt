@@ -1,0 +1,691 @@
+
+> smartpantry@0.0.0 build
+> vite build
+
+2025-12-09T03:29:44.962Z vite:config config file loaded in 56.62ms
+2025-12-09T03:29:44.965Z vite:env loading env files: [ '.env', '.env.local', '.env.production', '.env.production.local' ]
+2025-12-09T03:29:44.966Z vite:env env files loaded in 2.29ms
+2025-12-09T03:29:44.968Z vite:env using resolved env: {
+  VITE_GEMINI_API_KEY: 'AIzaSyC3W3KRmPOK0oXmwvQ60dEclHD3FEbG8vQ',
+  VITE_GOOGLE_CSE_API_KEY: 'AIzaSyDV9_ZtZP7cJEFkwflw-J8in5uhBaqPSA8',
+  VITE_GOOGLE_CSE_ID: 'b4dd3bf3c88eb40f4',
+  VITE_API_KEY: 'AIzaSyBqJB2SjnyoKvNPx5jZbGD96DnqMLrVsOc',
+  VITE_AUTH_DOMAIN: 'gen-lang-client-0893655267.firebaseapp.com',
+  VITE_PROJECT_ID: 'gen-lang-client-0893655267',
+  VITE_STORAGE_BUCKET: 'gen-lang-client-0893655267.appspot.com',
+  VITE_MESSAGING_SENDER_ID: '651327126572',
+  VITE_APP_ID: '1:651327126572:web:2ab6f25e9b9bd0caff6589',
+  VITE_MEASUREMENT_ID: 'G-EX7Q4N2Z81',
+  VITE_FIREBASE_FUNCTIONS_URL: 'https://us-central1-gen-lang-client-0893655267.cloudfunctions.net',
+  ALLUSERSPROFILE: 'C:\\ProgramData',
+  APPDATA: 'C:\\Users\\cjohn\\AppData\\Roaming',
+  BUNDLED_DEBUGPY_PATH: 'c:\\Users\\cjohn\\.vscode\\extensions\\ms-python.debugpy-2025.16.0-win32-x64\\bundled\\libs\\debugpy',
+  ChocolateyInstall: 'C:\\ProgramData\\chocolatey',
+  ChocolateyLastPathUpdate: '134091430311958108',
+  CHROME_CRASHPAD_PIPE_NAME: '\\\\.\\pipe\\crashpad_52968_WVVDLETSASVREGBI',
+  claude: 'C:\\Users\\cjohn\\.local\\bin',
+  COLOR: '0',
+  COLORTERM: 'truecolor',
+  CommonProgramFiles: 'C:\\Program Files\\Common Files',
+  'CommonProgramFiles(x86)': 'C:\\Program Files (x86)\\Common Files',
+  CommonProgramW6432: 'C:\\Program Files\\Common Files',
+  COMPUTERNAME: 'DELL',
+  ComSpec: 'C:\\WINDOWS\\system32\\cmd.exe',
+  CONDA_DEFAULT_ENV: 'base',
+  CONDA_EXE: 'C:\\Users\\cjohn\\miniconda3\\Scripts\\conda.exe',
+  CONDA_PREFIX: 'C:\\Users\\cjohn\\miniconda3',
+  CONDA_PROMPT_MODIFIER: '(base) ',
+  CONDA_PYTHON_EXE: 'C:\\Users\\cjohn\\miniconda3\\python.exe',
+  CONDA_SHLVL: '1',
+  CUDA_PATH: 'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.0',
+  CUDA_PATH_V13_0: 'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.0',
+  DEBUG: 'vite:*',
+  DriverData: 'C:\\Windows\\System32\\Drivers\\DriverData',
+  EDITOR: 'C:\\WINDOWS\\notepad.exe',
+  EFC_16624_1592913036: '1',
+  GIT_ASKPASS: 'c:\\Program Files\\Microsoft VS Code\\resources\\app\\extensions\\git\\dist\\askpass.sh',
+  GIT_PAGER: 'cat',
+  HOME: 'C:\\Users\\cjohn',
+  HOMEDRIVE: 'C:',
+  HOMEPATH: '\\Users\\cjohn',
+  IGCCSVC_DB: 'AQAAANCMnd8BFdERjHoAwE/Cl+sBAAAAgXkfgGmp8UGZhhu9xOHT8QQAAAACAAAAAAAQZgAAAAEAACAAAADu9CrvJcbJSRVGR6Gx5Kqfyjqcz+CwugXqsrIhJi3EfAAAAAAOgAAAAAIAACAAAACc5Fl9J3lESdNL/3pK3L/RTRt+dLTxy8VWmTCJbdCs2mAAAABE2mEBz/vaPyVXkr7sGz13tAzUbg7q6VdukF6kDAATZ+OGrVr5iUrRkTN9XY/J4yskeINsk10b9TsOY2esB1C5GoTqUvtSIT+1N2aaWVKQXfbl0BGm5ic4PaYSBcnJ4qVAAAAA21puhbaCSBHpks43ydu+avAMMi92jK6sfYiCcZkQT6fjsadydpSEdaqFcN+QqJeipYfhE5LfcXrVQC4+5CRQrA==',
+  INIT_CWD: 'C:\\Users\\cjohn\\pantry',
+  JAVA_HOME: 'C:\\Program Files\\Java\\jdk-21',
+  LANG: 'en_US.UTF-8',
+  LOCALAPPDATA: 'C:\\Users\\cjohn\\AppData\\Local',
+  LOGONSERVER: '\\\\DELL',
+  MAVEN_HOME: 'C:\\Maven',
+  NODE: 'C:\\nvm4w\\nodejs\\node.exe',
+  NODE_ENV: 'production',
+  npm_command: 'run',
+  npm_config_cache: 'C:\\Users\\cjohn\\AppData\\Local\\npm-cache',
+  npm_config_globalconfig: 'C:\\nvm4w\\nodejs\\etc\\npmrc',
+  npm_config_global_prefix: 'C:\\nvm4w\\nodejs',
+  npm_config_init_module: 'C:\\Users\\cjohn\\.npm-init.js',
+  npm_config_local_prefix: 'C:\\Users\\cjohn\\pantry',
+  npm_config_node_gyp: 'C:\\Users\\cjohn\\AppData\\Local\\nvm\\v20.19.6\\node_modules\\npm\\node_modules\\node-gyp\\bin\\node-gyp.js',
+  npm_config_noproxy: '',
+  npm_config_npm_version: '11.6.4',
+  npm_config_prefix: 'C:\\nvm4w\\nodejs',
+  npm_config_userconfig: 'C:\\Users\\cjohn\\.npmrc',
+  npm_config_user_agent: 'npm/11.6.4 node/v20.19.6 win32 x64 workspaces/false',
+  npm_execpath: 'C:\\Users\\cjohn\\AppData\\Local\\nvm\\v20.19.6\\node_modules\\npm\\bin\\npm-cli.js',
+  npm_lifecycle_event: 'build',
+  npm_lifecycle_script: 'vite build',
+  npm_node_execpath: 'C:\\nvm4w\\nodejs\\node.exe',
+  npm_package_json: 'C:\\Users\\cjohn\\pantry\\package.json',
+  npm_package_name: 'smartpantry',
+  npm_package_version: '0.0.0',
+  NUMBER_OF_PROCESSORS: '20',
+  NVM_HOME: 'C:\\Users\\cjohn\\AppData\\Local\\nvm',
+  NVM_SYMLINK: 'C:\\nvm4w\\nodejs',
+  OculusBase: 'C:\\Program Files\\Oculus\\',
+  OneDrive: 'C:\\Users\\cjohn\\OneDrive',
+  OneDriveConsumer: 'C:\\Users\\cjohn\\OneDrive',
+  ORIGINAL_XDG_CURRENT_DESKTOP: 'undefined',
+  OS: 'Windows_NT',
+  PATH: 'C:\\Users\\cjohn\\pantry\\node_modules\\.bin;C:\\Users\\cjohn\\node_modules\\.bin;C:\\Users\\node_modules\\.bin;C:\\node_modules\\.bin;C:\\Users\\cjohn\\AppData\\Local\\nvm\\v20.19.6\\node_modules\\npm\\node_modules\\@npmcli\\run-script\\lib\\node-gyp-bin;C:\\Users\\cjohn\\miniconda3;C:\\Users\\cjohn\\miniconda3\\Library\\mingw-w64\\bin;C:\\Users\\cjohn\\miniconda3\\Library\\usr\\bin;C:\\Users\\cjohn\\miniconda3\\Library\\bin;C:\\Users\\cjohn\\miniconda3\\Scripts;C:\\Users\\cjohn\\miniconda3\\bin;C:\\Users\\cjohn\\miniconda3\\condabin;C:\\Program Files\\PowerShell\\7;c:\\Users\\cjohn\\AppData\\Roaming\\Code\\User\\globalStorage\\github.copilot-chat\\debugCommand;c:\\Users\\cjohn\\AppData\\Roaming\\Code\\User\\globalStorage\\github.copilot-chat\\copilotCli;C:\\Program Files\\Common Files\\Oracle\\Java\\javapath;C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.9.10-hotspot\\bin;C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.17.10-hotspot\\bin;C:\\Python314\\Scripts;C:\\Python314;C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.0\\bin\\x64;C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.0\\bin;C:\\Program Files\\Oculus\\Support\\oculus-runtime;C:\\Windows\\system32;C:\\Windows;C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0;C:\\Windows\\System32\\OpenSSH;C:\\Program Files\\dotnet;C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common;C:\\Program Files\\NVIDIA Corporation\\NVIDIA NvDLISR;C:\\Program Files\\Microsoft VS Code\\bin;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\WINDOWS\\System32\\Wbem;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0;C:\\WINDOWS\\System32\\OpenSSH;C:\\Program Files (x86)\\PowerShell\\7;C:\\Program Files\\PuTTY;C:\\Program Files\\PowerShell\\7-preview\\preview;C:\\Program Files (x86)\\Bitvise SSH Client;C:\\Program Files (x86)\\AOMEI;C:\\Program Files\\cursor\\resources\\app\\bin;C:\\Program Files\\PowerShell\\7;C:\\Program Files\\Git\\cmd;C:\\Program Files\\NVIDIA Corporation\\Nsight Compute 2025.3.0;C:\\Program Files\\Docker\\Docker\\resources\\bin;C:\\ProgramData\\chocolatey\\bin;C:\\nvm4w\\nodejs;C:\\nvm4w\\nodejs;C:\\Program Files\\nodejs;C:\\Maven\\bin;C:\\ProgramData\\chocolatey\\lib\\maven\\apache-maven-3.9.11\\bin;C:\\Program Files (x86)\\Google\\Cloud SDK\\google-cloud-sdk\\bin;C:\\Users\\cjohn\\.cargo\\bin;C:\\Users\\cjohn\\AppData\\Local\\Programs\\Python\\Python313\\Scripts;C:\\Users\\cjohn\\AppData\\Local\\Programs\\Python\\Python313;C:\\Users\\cjohn\\AppData\\Local\\Programs\\Python\\Launcher;C:\\Users\\cjohn\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Users\\cjohn\\AppData\\Local\\GitHubDesktop\\bin;C:\\Program Files (x86)\\Nmap;C:\\Users\\cjohn\\AppData\\Local\\Programs\\Ollama;C:\\Users\\cjohn\\.bun\\bin;C:\\Users\\cjohn\\.dotnet\\tools;C:\\Users\\cjohn\\AppData\\Local\\Google\\Cloud SDK\\google-cloud-sdk\\bin;C:\\Users\\cjohn\\AppData\\Local\\nvm;C:\\nvm4w\\nodejs;C:\\Users\\cjohn\\AppData\\Roaming\\npm;c:\\Users\\cjohn\\.vscode\\extensions\\ms-python.debugpy-2025.16.0-win32-x64\\bundled\\scripts\\noConfigScripts;c:\\Users\\cjohn\\.vscode\\extensions\\vscjava.vscode-java-debug-0.58.3\\bundled\\scripts\\noConfigScripts',
+  PATHEXT: '.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC;.PY;.PYW;.CPL',
+  POWERSHELL_DISTRIBUTION_CHANNEL: 'MSI:Windows 10 Pro',
+  PROCESSOR_ARCHITECTURE: 'AMD64',
+  PROCESSOR_IDENTIFIER: 'Intel64 Family 6 Model 154 Stepping 3, GenuineIntel',
+  PROCESSOR_LEVEL: '6',
+  PROCESSOR_REVISION: '9a03',
+  PROG27B48B2C052: '1',
+  ProgramData: 'C:\\ProgramData',
+  ProgramFiles: 'C:\\Program Files',
+  'ProgramFiles(x86)': 'C:\\Program Files (x86)',
+  ProgramW6432: 'C:\\Program Files',
+  PROMPT: '$P$G',
+  PSModulePath: 'C:\\Users\\cjohn\\Documents\\PowerShell\\Modules;C:\\Program Files\\PowerShell\\Modules;c:\\program files\\powershell\\7\\Modules;C:\\Users\\cjohn\\Documents\\WindowsPowerShell\\Modules;C:\\Users\\cjohn\\AppData\\Local\\Google\\Cloud SDK\\google-cloud-sdk\\platform\\PowerShell;C:\\Program Files\\WindowsPowerShell\\Modules;C:\\WINDOWS\\system32\\WindowsPowerShell\\v1.0\\Modules;C:\\Program Files (x86)\\Google\\Cloud SDK\\google-cloud-sdk\\platform\\PowerShell',
+  PUBLIC: 'C:\\Users\\Public',
+  PYDEVD_DISABLE_FILE_VALIDATION: '1',
+  PYTHONSTARTUP: 'c:\\Users\\cjohn\\AppData\\Roaming\\Code\\User\\workspaceStorage\\acfec388b59811c5ed6f2b486643afea\\ms-python.python\\pythonrc.py',
+  PYTHON_BASIC_REPL: '1',
+  SESSIONNAME: 'Console',
+  SSL_CERT_DIR: 'C:\\Users\\cjohn\\miniconda3\\Library\\ssl\\certs',
+  SSL_CERT_FILE: 'C:\\Users\\cjohn\\miniconda3\\Library\\ssl\\cacert.pem',
+  SystemDrive: 'C:',
+  SystemRoot: 'C:\\WINDOWS',
+  TEMP: 'C:\\Users\\cjohn\\AppData\\Local\\Temp',
+  TERM_PROGRAM: 'vscode',
+  TERM_PROGRAM_VERSION: '1.106.3',
+  TMP: 'C:\\Users\\cjohn\\AppData\\Local\\Temp',
+  USERDOMAIN: 'DELL',
+  USERDOMAIN_ROAMINGPROFILE: 'DELL',
+  USERNAME: 'cjohn',
+  USERPROFILE: 'C:\\Users\\cjohn',
+  VSCODE_DEBUGPY_ADAPTER_ENDPOINTS: 'c:\\Users\\cjohn\\.vscode\\extensions\\ms-python.debugpy-2025.16.0-win32-x64\\.noConfigDebugAdapterEndpoints\\endpoint-ef01d37b6a56b871.txt',
+  VSCODE_GIT_ASKPASS_EXTRA_ARGS: '',
+  VSCODE_GIT_ASKPASS_MAIN: 'c:\\Program Files\\Microsoft VS Code\\resources\\app\\extensions\\git\\dist\\askpass-main.js',
+  VSCODE_GIT_ASKPASS_NODE: 'C:\\Program Files\\Microsoft VS Code\\Code.exe',
+  VSCODE_GIT_IPC_HANDLE: '\\\\.\\pipe\\vscode-git-879d418fc1-sock',
+  VSCODE_INJECTION: '1',
+  VSCODE_JAVA_EXEC: 'C:\\Program Files\\Java\\jdk-21\\bin\\java',
+  VSCODE_JDWP_ADAPTER_ENDPOINTS: 'c:\\Users\\cjohn\\.vscode\\extensions\\vscjava.vscode-java-debug-0.58.3\\.noConfigDebugAdapterEndpoints\\endpoint-ef01d37b6a56b871.txt',
+  VSCODE_PYTHON_AUTOACTIVATE_GUARD: '1',
+  windir: 'C:\\WINDOWS',
+  ZES_ENABLE_SYSMAN: '1',
+  _CONDA_EXE: 'C:\\Users\\cjohn\\miniconda3\\Scripts\\conda.exe',
+  _CONDA_ROOT: 'C:\\Users\\cjohn\\miniconda3',
+  __CONDA_OPENSSL_CERT_DIR_SET: '1',
+  __CONDA_OPENSSL_CERT_FILE_SET: '1'
+}
+2025-12-09T03:29:44.971Z vite:env loading env files: [
+  'C:/Users/cjohn/pantry/.env',
+  'C:/Users/cjohn/pantry/.env.local',
+  'C:/Users/cjohn/pantry/.env.production',
+  'C:/Users/cjohn/pantry/.env.production.local'
+]
+2025-12-09T03:29:44.972Z vite:env env files loaded in 0.57ms
+2025-12-09T03:29:44.973Z vite:env using resolved env: {
+  VITE_GEMINI_API_KEY: 'AIzaSyC3W3KRmPOK0oXmwvQ60dEclHD3FEbG8vQ',
+  VITE_GOOGLE_CSE_API_KEY: 'AIzaSyDV9_ZtZP7cJEFkwflw-J8in5uhBaqPSA8',
+  VITE_GOOGLE_CSE_ID: 'b4dd3bf3c88eb40f4',
+  VITE_API_KEY: 'AIzaSyBqJB2SjnyoKvNPx5jZbGD96DnqMLrVsOc',
+  VITE_AUTH_DOMAIN: 'gen-lang-client-0893655267.firebaseapp.com',
+  VITE_PROJECT_ID: 'gen-lang-client-0893655267',
+  VITE_STORAGE_BUCKET: 'gen-lang-client-0893655267.appspot.com',
+  VITE_MESSAGING_SENDER_ID: '651327126572',
+  VITE_APP_ID: '1:651327126572:web:2ab6f25e9b9bd0caff6589',
+  VITE_MEASUREMENT_ID: 'G-EX7Q4N2Z81',
+  VITE_FIREBASE_FUNCTIONS_URL: 'https://us-central1-gen-lang-client-0893655267.cloudfunctions.net'
+}
+2025-12-09T03:29:45.008Z vite:config using resolved config: {
+  server: {
+    port: 3000,
+    strictPort: false,
+    host: '0.0.0.0',
+    allowedHosts: [],
+    https: undefined,
+    open: false,
+    proxy: undefined,
+    cors: {
+      origin: /^https?:\/\/(?:(?:[^:]+\.)?localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/
+    },
+    headers: {},
+    warmup: { clientFiles: [], ssrFiles: [] },
+    middlewareMode: false,
+    fs: {
+      strict: true,
+      deny: [ '.env', '.env.*', '*.{crt,pem}', '**/.git/**' ],
+      allow: [ 'C:/Users/cjohn/pantry' ]
+    },
+    preTransformRequests: true,
+    perEnvironmentStartEndDuringDev: false,
+    sourcemapIgnoreList: [Function: isInNodeModules$1]
+  },
+  plugins: [
+    'vite:build-metadata',
+    'vite:watch-package-data',
+    'alias',
+    'vite:react-babel',
+    'vite:react-refresh',
+    'vite-plugin-pwa',
+    'vite:modulepreload-polyfill',
+    'vite:resolve',
+    'vite:html-inline-proxy',
+    'vite:css',
+    'vite:esbuild',
+    'vite:json',
+    'vite:wasm-helper',
+    'vite:worker',
+    'vite:asset',
+    'vite:react-virtual-preamble',
+    'vite:wasm-fallback',
+    'vite:define',
+    'vite:css-post',
+    'vite:build-html',
+    'vite:worker-import-meta-url',
+    'vite:asset-import-meta-url',
+    'vite:force-systemjs-wrap-complete',
+    'commonjs',
+    'vite:data-uri',
+    'vite:rollup-options-plugins',
+    'vite:dynamic-import-vars',
+    'vite:import-glob',
+    'vite-plugin-pwa:info',
+    'vite-plugin-pwa:build',
+    'vite-plugin-pwa:pwa-assets',
+    'vite:build-import-analysis',
+    'vite:esbuild-transpile',
+    'vite:terser',
+    'vite:manifest',
+    'vite:ssr-manifest',
+    'vite:reporter',
+    'vite:load-fallback'
+  ],
+  define: {
+    'process.env.API_KEY': undefined,
+    'process.env.GEMINI_API_KEY': undefined
+  },
+  resolve: {
+    externalConditions: [ 'node' ],
+    extensions: [
+      '.mjs',  '.js',
+      '.mts',  '.ts',
+      '.jsx',  '.tsx',
+      '.json'
+    ],
+    dedupe: [],
+    noExternal: [],
+    external: [],
+    preserveSymlinks: false,
+    alias: [
+      { find: '@', replacement: 'C:\\Users\\cjohn\\pantry' },
+      {
+        find: /^\/?@vite\/env/,
+        replacement: '/@fs/C:/Users/cjohn/pantry/node_modules/vite/dist/client/env.mjs'
+      },
+      {
+        find: /^\/?@vite\/client/,
+        replacement: '/@fs/C:/Users/cjohn/pantry/node_modules/vite/dist/client/client.mjs'
+      }
+    ],
+    mainFields: [ 'browser', 'module', 'jsnext:main', 'jsnext' ],
+    conditions: [ 'module', 'browser', 'development|production' ],
+    builtins: []
+  },
+  build: {
+    target: [ 'es2020', 'edge88', 'firefox78', 'chrome87', 'safari14' ],
+    polyfillModulePreload: true,
+    modulePreload: { polyfill: true },
+    outDir: 'dist',
+    assetsDir: 'assets',
+    assetsInlineLimit: 4096,
+    sourcemap: false,
+    terserOptions: {},
+    rollupOptions: { onwarn: [Function: onwarn] },
+    commonjsOptions: { include: [ /node_modules/ ], extensions: [ '.js', '.cjs' ] },
+    dynamicImportVarsOptions: { warnOnError: true, exclude: [ /node_modules/ ] },
+    write: true,
+    emptyOutDir: null,
+    copyPublicDir: true,
+    manifest: false,
+    lib: false,
+    ssrManifest: false,
+    ssrEmitAssets: false,
+    reportCompressedSize: true,
+    chunkSizeWarningLimit: 500,
+    watch: null,
+    cssCodeSplit: true,
+    minify: 'esbuild',
+    ssr: false,
+    emitAssets: true,
+    createEnvironment: [Function: createEnvironment],
+    cssTarget: [ 'es2020', 'edge88', 'firefox78', 'chrome87', 'safari14' ],
+    cssMinify: true
+  },
+  esbuild: { jsxDev: false, jsx: 'automatic', jsxImportSource: undefined },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react/jsx-dev-runtime',
+      'react/jsx-runtime'
+    ],
+    exclude: [],
+    needsInterop: [],
+    extensions: [],
+    disabled: undefined,
+    holdUntilCrawlEnd: true,
+    force: false,
+    noDiscovery: false,
+    esbuildOptions: { preserveSymlinks: false, jsx: 'automatic' }
+  },
+  ssr: {
+    target: 'node',
+    optimizeDeps: {
+      esbuildOptions: { preserveSymlinks: false },
+      include: [],
+      exclude: [],
+      needsInterop: [],
+      extensions: [],
+      holdUntilCrawlEnd: true,
+      force: false,
+      noDiscovery: true
+    },
+    noExternal: [ 'workbox-window' ],
+    external: [],
+    resolve: {
+      conditions: [ 'module', 'node', 'development|production' ],
+      externalConditions: [ 'node' ]
+    }
+  },
+  environments: {
+    client: {
+      define: {
+        'process.env.API_KEY': undefined,
+        'process.env.GEMINI_API_KEY': undefined
+      },
+      resolve: {
+        externalConditions: [ 'node' ],
+        extensions: [
+          '.mjs',  '.js',
+          '.mts',  '.ts',
+          '.jsx',  '.tsx',
+          '.json'
+        ],
+        dedupe: [],
+        noExternal: [],
+        external: [],
+        preserveSymlinks: false,
+        alias: [
+          { find: '@', replacement: 'C:\\Users\\cjohn\\pantry' },
+          {
+            find: /^\/?@vite\/env/,
+            replacement: '/@fs/C:/Users/cjohn/pantry/node_modules/vite/dist/client/env.mjs'
+          },
+          {
+            find: /^\/?@vite\/client/,
+            replacement: '/@fs/C:/Users/cjohn/pantry/node_modules/vite/dist/client/client.mjs'
+          }
+        ],
+        mainFields: [ 'browser', 'module', 'jsnext:main', 'jsnext' ],
+        conditions: [ 'module', 'browser', 'development|production' ],
+        builtins: []
+      },
+      keepProcessEnv: false,
+      consumer: 'client',
+      optimizeDeps: {
+        include: [
+          'react',
+          'react-dom',
+          'react/jsx-dev-runtime',
+          'react/jsx-runtime'
+        ],
+        exclude: [],
+        needsInterop: [],
+        extensions: [],
+        disabled: undefined,
+        holdUntilCrawlEnd: true,
+        force: false,
+        noDiscovery: false,
+        esbuildOptions: { preserveSymlinks: false, jsx: 'automatic' }
+      },
+      dev: {
+        warmup: [],
+        sourcemap: { js: true },
+        sourcemapIgnoreList: [Function: isInNodeModules$1],
+        preTransformRequests: true,
+        createEnvironment: [Function: defaultCreateClientDevEnvironment],
+        recoverable: true,
+        moduleRunnerTransform: false
+      },
+      build: {
+        target: [ 'es2020', 'edge88', 'firefox78', 'chrome87', 'safari14' ],
+        polyfillModulePreload: true,
+        modulePreload: { polyfill: true },
+        outDir: 'dist',
+        assetsDir: 'assets',
+        assetsInlineLimit: 4096,
+        sourcemap: false,
+        terserOptions: {},
+        rollupOptions: { onwarn: [Function: onwarn] },
+        commonjsOptions: { include: [ /node_modules/ ], extensions: [ '.js', '.cjs' ] },
+        dynamicImportVarsOptions: { warnOnError: true, exclude: [ /node_modules/ ] },
+        write: true,
+        emptyOutDir: null,
+        copyPublicDir: true,
+        manifest: false,
+        lib: false,
+        ssrManifest: false,
+        ssrEmitAssets: false,
+        reportCompressedSize: true,
+        chunkSizeWarningLimit: 500,
+        watch: null,
+        cssCodeSplit: true,
+        minify: 'esbuild',
+        ssr: false,
+        emitAssets: true,
+        createEnvironment: [Function: createEnvironment],
+        cssTarget: [ 'es2020', 'edge88', 'firefox78', 'chrome87', 'safari14' ],
+        cssMinify: true
+      }
+    },
+    ssr: {
+      define: {
+        'process.env.API_KEY': undefined,
+        'process.env.GEMINI_API_KEY': undefined
+      },
+      resolve: {
+        externalConditions: [ 'node' ],
+        extensions: [
+          '.mjs',  '.js',
+          '.mts',  '.ts',
+          '.jsx',  '.tsx',
+          '.json'
+        ],
+        dedupe: [],
+        noExternal: [ 'workbox-window' ],
+        external: [],
+        preserveSymlinks: false,
+        alias: [
+          { find: '@', replacement: 'C:\\Users\\cjohn\\pantry' },
+          {
+            find: /^\/?@vite\/env/,
+            replacement: '/@fs/C:/Users/cjohn/pantry/node_modules/vite/dist/client/env.mjs'
+          },
+          {
+            find: /^\/?@vite\/client/,
+            replacement: '/@fs/C:/Users/cjohn/pantry/node_modules/vite/dist/client/client.mjs'
+          }
+        ],
+        mainFields: [ 'module', 'jsnext:main', 'jsnext' ],
+        conditions: [ 'module', 'node', 'development|production' ],
+        builtins: [
+          '_http_agent',         '_http_client',        '_http_common',
+          '_http_incoming',      '_http_outgoing',      '_http_server',
+          '_stream_duplex',      '_stream_passthrough', '_stream_readable',
+          '_stream_transform',   '_stream_wrap',        '_stream_writable',
+          '_tls_common',         '_tls_wrap',           'assert',
+          'assert/strict',       'async_hooks',         'buffer',
+          'child_process',       'cluster',             'console',
+          'constants',           'crypto',              'dgram',
+          'diagnostics_channel', 'dns',                 'dns/promises',
+          'domain',              'events',              'fs',
+          'fs/promises',         'http',                'http2',
+          'https',               'inspector',           'inspector/promises',
+          'module',              'net',                 'os',
+          'path',                'path/posix',          'path/win32',
+          'perf_hooks',          'process',             'punycode',
+          'querystring',         'readline',            'readline/promises',
+          'repl',                'stream',              'stream/consumers',
+          'stream/promises',     'stream/web',          'string_decoder',
+          'sys',                 'timers',              'timers/promises',
+          'tls',                 'trace_events',        'tty',
+          'url',                 'util',                'util/types',
+          'v8',                  'vm',                  'wasi',
+          'worker_threads',      'zlib',                /^node:/,
+          /^npm:/,               /^bun:/
+        ]
+      },
+      keepProcessEnv: true,
+      consumer: 'server',
+      optimizeDeps: {
+        include: [],
+        exclude: [],
+        needsInterop: [],
+        extensions: [],
+        disabled: undefined,
+        holdUntilCrawlEnd: true,
+        force: false,
+        noDiscovery: true,
+        esbuildOptions: { preserveSymlinks: false }
+      },
+      dev: {
+        warmup: [],
+        sourcemap: { js: true },
+        sourcemapIgnoreList: [Function: isInNodeModules$1],
+        preTransformRequests: false,
+        createEnvironment: [Function: defaultCreateDevEnvironment],
+        recoverable: false,
+        moduleRunnerTransform: true
+      },
+      build: {
+        target: [ 'es2020', 'edge88', 'firefox78', 'chrome87', 'safari14' ],
+        polyfillModulePreload: true,
+        modulePreload: { polyfill: true },
+        outDir: 'dist',
+        assetsDir: 'assets',
+        assetsInlineLimit: 4096,
+        sourcemap: false,
+        terserOptions: {},
+        rollupOptions: { onwarn: [Function: onwarn] },
+        commonjsOptions: { include: [ /node_modules/ ], extensions: [ '.js', '.cjs' ] },
+        dynamicImportVarsOptions: { warnOnError: true, exclude: [ /node_modules/ ] },
+        write: true,
+        emptyOutDir: null,
+        copyPublicDir: true,
+        manifest: false,
+        lib: false,
+        ssrManifest: false,
+        ssrEmitAssets: false,
+        reportCompressedSize: true,
+        chunkSizeWarningLimit: 500,
+        watch: null,
+        cssCodeSplit: true,
+        minify: false,
+        ssr: true,
+        emitAssets: true,
+        createEnvironment: [Function: createEnvironment],
+        cssTarget: [ 'es2020', 'edge88', 'firefox78', 'chrome87', 'safari14' ],
+        cssMinify: 'esbuild'
+      }
+    }
+  },
+  configFile: 'C:/Users/cjohn/pantry/vite.config.ts',
+  configFileDependencies: [ 'C:/Users/cjohn/pantry/vite.config.ts' ],
+  inlineConfig: {
+    root: undefined,
+    base: undefined,
+    mode: undefined,
+    configFile: undefined,
+    configLoader: undefined,
+    logLevel: undefined,
+    clearScreen: undefined,
+    build: {}
+  },
+  root: 'C:/Users/cjohn/pantry',
+  base: '/',
+  decodedBase: '/',
+  rawBase: '/',
+  publicDir: 'C:/Users/cjohn/pantry/public',
+  cacheDir: 'C:/Users/cjohn/pantry/node_modules/.vite',
+  command: 'build',
+  mode: 'production',
+  isWorker: false,
+  mainConfig: null,
+  bundleChain: [],
+  isProduction: true,
+  css: {
+    transformer: 'postcss',
+    preprocessorMaxWorkers: 0,
+    devSourcemap: false
+  },
+  json: { namedExports: true, stringify: 'auto' },
+  builder: undefined,
+  preview: {
+    port: 4173,
+    strictPort: false,
+    host: '0.0.0.0',
+    allowedHosts: [],
+    https: undefined,
+    open: false,
+    proxy: undefined,
+    cors: {
+      origin: /^https?:\/\/(?:(?:[^:]+\.)?localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/
+    },
+    headers: {}
+  },
+  envDir: 'C:/Users/cjohn/pantry',
+  env: {
+    VITE_GEMINI_API_KEY: 'AIzaSyC3W3KRmPOK0oXmwvQ60dEclHD3FEbG8vQ',
+    VITE_GOOGLE_CSE_API_KEY: 'AIzaSyDV9_ZtZP7cJEFkwflw-J8in5uhBaqPSA8',
+    VITE_GOOGLE_CSE_ID: 'b4dd3bf3c88eb40f4',
+    VITE_API_KEY: 'AIzaSyBqJB2SjnyoKvNPx5jZbGD96DnqMLrVsOc',
+    VITE_AUTH_DOMAIN: 'gen-lang-client-0893655267.firebaseapp.com',
+    VITE_PROJECT_ID: 'gen-lang-client-0893655267',
+    VITE_STORAGE_BUCKET: 'gen-lang-client-0893655267.appspot.com',
+    VITE_MESSAGING_SENDER_ID: '651327126572',
+    VITE_APP_ID: '1:651327126572:web:2ab6f25e9b9bd0caff6589',
+    VITE_MEASUREMENT_ID: 'G-EX7Q4N2Z81',
+    VITE_FIREBASE_FUNCTIONS_URL: 'https://us-central1-gen-lang-client-0893655267.cloudfunctions.net',
+    BASE_URL: '/',
+    MODE: 'production',
+    DEV: false,
+    PROD: true
+  },
+  assetsInclude: [Function: assetsInclude],
+  logger: {
+    hasWarned: false,
+    info: [Function: info],
+    warn: [Function: warn],
+    warnOnce: [Function: warnOnce],
+    error: [Function: error],
+    clearScreen: [Function: clearScreen],
+    hasErrorLogged: [Function: hasErrorLogged]
+  },
+  packageCache: Map(1) {
+    'fnpd_C:/Users/cjohn/pantry' => {
+      dir: 'C:/Users/cjohn/pantry',
+      data: {
+        name: 'smartpantry',
+        private: false,
+        version: '0.0.0',
+        type: 'module',
+        scripts: {
+          dev: 'vite',
+          build: 'vite build',
+          preview: 'vite preview',
+          'generate:icons': 'npx pwa-asset-generator public/icons/icon512.png resources --manifest ./public/manifest.webmanifest --favicon --index --android --ios'
+        },
+        dependencies: {
+          '@capacitor/android': '^7.4.4',
+          '@capacitor/camera': '^7.0.2',
+          '@capacitor/cli': '^7.4.4',
+          '@capacitor/core': '^7.4.4',
+          '@capacitor/local-notifications': '^7.0.3',
+          '@google/genai': '^1.31.0',
+          adb: '^0.2.0',
+          firebase: '^12.6.0',
+          'lucide-react': '^0.555.0',
+          react: '^19.2.1',
+          'react-dom': '^19.2.1'
+        },
+        devDependencies: {
+          '@types/node': '^22.14.0',
+          '@vitejs/plugin-react': '^5.0.0',
+          'eslint-plugin-import': '^2.32.0',
+          typescript: '~5.8.2',
+          vite: '^6.4.1',
+          'vite-plugin-pwa': '^1.2.0'
+        }
+      },
+      hasSideEffects: [Function: hasSideEffects],
+      setResolvedCache: [Function: setResolvedCache],
+      getResolvedCache: [Function: getResolvedCache]
+    },
+    set: [Function (anonymous)]
+  },
+  worker: { format: 'iife', plugins: '() => plugins', rollupOptions: {} },
+  appType: 'spa',
+  experimental: { importGlobRestoreExtension: false, hmrPartialAccept: false },
+  future: undefined,
+  dev: {
+    warmup: [],
+    sourcemap: { js: true },
+    sourcemapIgnoreList: [Function: isInNodeModules$1],
+    preTransformRequests: false,
+    createEnvironment: [Function: defaultCreateDevEnvironment],
+    recoverable: false,
+    moduleRunnerTransform: false
+  },
+  webSocketToken: 'p9jmvEkoMXVO',
+  getSortedPlugins: [Function: getSortedPlugins],
+  getSortedPluginHooks: [Function: getSortedPluginHooks],
+  createResolver: [Function: createResolver],
+  fsDenyGlob: [Function: arrayMatcher],
+  safeModulePaths: Set(0) {},
+  additionalAllowedHosts: [ '0.0.0.0', '0.0.0.0' ],
+  [Symbol(vite:resolved-config)]: true
+}
+[36mvite v6.4.1 [32mbuilding for production...[36m[39m
+
+/index.css doesn't exist at build time, it will remain unchanged to be resolved at runtime
+transforming...
+[32mΓ£ô[39m 1730 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) C:/Users/cjohn/pantry/node_modules/firebase/firestore/dist/esm/index.esm.js is dynamically imported by C:/Users/cjohn/pantry/App.tsx, C:/Users/cjohn/pantry/App.tsx, C:/Users/cjohn/pantry/App.tsx, C:/Users/cjohn/pantry/App.tsx, C:/Users/cjohn/pantry/App.tsx, C:/Users/cjohn/pantry/App.tsx but also statically imported by C:/Users/cjohn/pantry/App.tsx, C:/Users/cjohn/pantry/components/Settings.tsx, C:/Users/cjohn/pantry/firebaseConfig.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) C:/Users/cjohn/pantry/firebaseConfig.ts is dynamically imported by C:/Users/cjohn/pantry/components/Household.tsx but also statically imported by C:/Users/cjohn/pantry/App.tsx, C:/Users/cjohn/pantry/components/Login.tsx, C:/Users/cjohn/pantry/components/RecipeFinder.tsx, C:/Users/cjohn/pantry/components/Settings.tsx, dynamic import will not move module into another chunk.
+
+computing gzip size...
+[2mdist/[22m[32mregisterSW.js                               [39m[1m[2m    0.13 kB[22m[1m[22m
+[2mdist/[22m[32mmanifest.webmanifest                        [39m[1m[2m    0.40 kB[22m[1m[22m
+[2mdist/[22m[32mindex.html                                  [39m[1m[2m    6.01 kB[22m[1m[22m[2m Γöé gzip:   1.85 kB[22m
+[2mdist/[22m[32massets/apple-icon-180-D1_dUEwl.png          [39m[1m[2m   10.34 kB[22m[1m[22m
+[2mdist/[22m[32massets/favicon-196-Dw6akHUm.png             [39m[1m[2m   11.48 kB[22m[1m[22m
+[2mdist/[22m[32massets/apple-splash-2048-1536-CSpzNtpv.jpg  [39m[1m[2m   41.49 kB[22m[1m[22m
+[2mdist/[22m[32massets/apple-splash-1536-2048-BZLSM0Jr.jpg  [39m[1m[2m   43.38 kB[22m[1m[22m
+[2mdist/[22m[32massets/apple-splash-2388-1668-Ch17qeQe.jpg  [39m[1m[2m   48.17 kB[22m[1m[22m
+[2mdist/[22m[32massets/apple-splash-1668-2388-l23tzYzH.jpg  [39m[1m[2m   51.24 kB[22m[1m[22m
+[2mdist/[22m[32massets/apple-splash-2732-2048-BPSm0ZM-.jpg  [39m[1m[2m   63.62 kB[22m[1m[22m
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[2mdist/[22m[32massets/apple-splash-2048-2732-D-p_kDhV.jpg  [39m[1m[2m   66.75 kB[22m[1m[22m
+[2mdist/[22m[36massets/web-CGFwjNR6.js                      [39m[1m[2m    3.44 kB[22m[1m[22m[2m Γöé gzip:   1.09 kB[22m
+[2mdist/[22m[36massets/index-BEQZiF9i.js                    [39m[1m[33m1,181.75 kB[39m[22m[2m Γöé gzip: 284.87 kB[22m
+[32mΓ£ô built in 3.71s[39m
+
+PWA v1.2.0
+mode      generateSW
+precache  7 entries (1163.40 KiB)
+files generated
+  dist/sw.js
+  dist/workbox-8c29f6e4.js

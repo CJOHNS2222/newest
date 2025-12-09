@@ -1,1 +1,1 @@
-export {inviteMember} from "./inviteMember";
+export {inviteMember, inviteMemberHttp} from "./inviteMember";

@@ -119,14 +119,17 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
   const removeMember = async (id: string) => {
     const memberToRemove = household.members.find(m => m.id === id);
     
-    // Update Firebase first
+      // Update Firebase first
     if (household.id && memberToRemove) {
       try {
         const householdRef = doc(db, 'households', household.id);
         // Remove by filtering
         const updatedMembers = household.members.filter(m => m.id !== id);
+        // Also update memberIds for security rules (extract ids where available)
+        const updatedMemberIds = updatedMembers.map(m => m.id).filter(Boolean);
         await updateDoc(householdRef, {
-          members: updatedMembers
+          members: updatedMembers,
+          memberIds: updatedMemberIds
         });
         
         // Only update local state after Firebase succeeds
