@@ -1,22 +1,7 @@
-  const handleForgotPassword = async () => {
-    setError(null);
-    setSuccess(null);
-    if (!validateEmail(email)) {
-      setError('Please enter your email address above to reset password.');
-      return;
-    }
-    try {
-      const auth = getAuth();
-      await auth.sendPasswordResetEmail(email);
-      setSuccess('Password reset email sent! Please check your inbox.');
-    } catch (error) {
-      setError('Failed to send reset email: ' + (error as Error).message);
-    }
-  };
 import React, { useState, useEffect } from 'react';
 import { ChefHat, Mail, Chrome } from 'lucide-react';
 import { User } from '../types';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, sendEmailVerification } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
 import { logEvent } from 'firebase/analytics';
 import { analytics } from '../firebaseConfig';
 
@@ -98,6 +83,22 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
     } catch (error) {
       setError((isSignup ? 'Signup' : 'Login') + ' failed: ' + (error as Error).message);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setError(null);
+    setSuccess(null);
+    if (!validateEmail(email)) {
+      setError('Please enter your email address above to reset password.');
+      return;
+    }
+    try {
+      const auth = getAuth();
+      await sendPasswordResetEmail(auth, email);
+      setSuccess('Password reset email sent! Please check your inbox.');
+    } catch (error) {
+      setError('Failed to send reset email: ' + (error as Error).message);
     }
   };
 
