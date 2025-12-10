@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, collection, addDoc, getDocs, setDoc, serverTimestamp, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { db, analytics } from './firebaseConfig'; // Adjust path if needed
@@ -15,15 +15,15 @@ import { ChefHat, ShoppingBasket, CalendarDays, UtensilsCrossed, Users, Sun, Moo
 import { User, PantryItem, DayPlan, StructuredRecipe, Household, ShoppingItem, SavedRecipe, RecipeRating, RecipeSearchResult } from './types';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { logEvent } from 'firebase/analytics';
-import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
-import { doc, setDoc, Timestamp } from 'firebase/firestore';
 
 async function saveDayPlan(householdId: string, day: DayPlan) {
   const id = day.date; // 'YYYY-MM-DD'
   const ref = doc(db, 'households', householdId, 'mealPlan', id);
   await setDoc(ref, {
     date: Timestamp.fromDate(new Date(day.date)),
-    meals: day.meals || []
+    meals: day.meals || [],
+    lastModifiedBy: localStorage.getItem('clientId') || null,
+    lastModifiedAt: serverTimestamp()
   }, { merge: true });
 }
 
@@ -61,28 +61,9 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('user');
     return saved ? JSON.parse(saved) : null;
   });
-// Firestore real-time sync for meal plan
-const start = new Date(); start.setHours(0,0,0,0);
-const end = new Date(start); end.setDate(end.getDate() + 7);
-const q = query(
-  collection(db, 'households', householdId, 'mealPlan'),
-  where('date', '>=', Timestamp.fromDate(start)),
-  where('date', '<', Timestamp.fromDate(end))
-);
-
-const unsubscribe = onSnapshot(q, snapshot => {
-  const days: Record<string, DayPlan> = {};
-  snapshot.forEach(doc => {
-    const data = doc.data();
-    const iso = data.date.toDate().toISOString().slice(0,10);
-    days[iso] = { date: iso, meals: data.meals || [] };
-  });
-
-  // Build array of 7 DayPlan in order, filling missing days with empty meals
-  const keys = next7DateKeys();
-  const result: DayPlan[] = keys.map(k => days[k] || { date: k, meals: [] });
-  setMealPlan(result);
-});
+  
+  
+// (mealPlan real-time listener is registered inside an effect below)
 
   // Keep `user` in sync with Firebase Auth to ensure rules use the correct uid
   useEffect(() => {
@@ -116,11 +97,33 @@ const unsubscribe = onSnapshot(q, snapshot => {
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
   const [ratings, setRatings] = useState<RecipeRating[]>([]);
   const [mealPlan, setMealPlan] = useState<DayPlan[]>([]);
+  // refs to household subcollection unsubscribe functions so we can cancel them immediately
+  const householdUnsubsRef = useRef<{ inventory?: (() => void) | null; shopping?: (() => void) | null; recipes?: (() => void) | null; mealPlan?: (() => void) | null }>({});
 
-  const [household, setHousehold] = useState<Household>(() => {
+  // Per-session client id used to mark writes so we can ignore our own snapshots
+  const clientId = React.useMemo(() => {
+    let id = localStorage.getItem('clientId');
+    if (!id) {
+      id = `client-${Math.random().toString(36).substr(2,9)}`;
+      localStorage.setItem('clientId', id);
+    }
+    return id;
+  }, []);
+
+  const [household, setHousehold] = useState<Household | null>(() => {
     const saved = localStorage.getItem('household');
-    return saved ? JSON.parse(saved) : { id: 'h1', name: 'My Family', members: [] };
+    return saved ? JSON.parse(saved) : null;
   });
+
+  // Helper to determine if current user is a member of the household
+  const isHouseholdMember = (h?: Household, u?: User | null) => {
+    if (!h || !u) return false;
+    if (Array.isArray(h.memberIds) && h.memberIds.includes(u.id)) return true;
+    if (Array.isArray(h.members)) {
+      return h.members.some(m => (m.id && m.id === u.id) || (m.email && m.email === u.email));
+    }
+    return false;
+  };
 
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem('settings');
@@ -138,10 +141,10 @@ const unsubscribe = onSnapshot(q, snapshot => {
   });
 
   // UI toasts and Firestore error reporting
-  const [toasts, setToasts] = useState<{ id: number; message: string; type?: 'error' | 'info' }[]>([]);
-  const addToast = (message: string, type: 'error' | 'info' = 'error', ttl = 5000) => {
+  const [toasts, setToasts] = useState<Array<{ id: number; message: string; type?: 'error' | 'info'; actionLabel?: string; action?: () => void }>>([]);
+  const addToast = (message: string, type: 'error' | 'info' = 'error', ttl = 4000, actionLabel?: string, action?: () => void) => {
     const id = Date.now() + Math.floor(Math.random() * 1000);
-    setToasts(prev => [{ id, message, type }, ...prev]);
+    setToasts(prev => [{ id, message, type, actionLabel, action }, ...prev]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), ttl);
   };
 
@@ -195,10 +198,36 @@ const unsubscribe = onSnapshot(q, snapshot => {
   };
 
   // Firestore real-time sync for user inventory (always) and household data (if in household)
+  // Autoselect user's household from Firestore (so mealPlan and household data load for members)
   useEffect(() => {
     if (!user?.id) return;
-    let unsubUserInventory = null, unsubHouseholdInventory = null, unsubShopping = null, unsubRecipes = null, unsubMealPlan = null;
+    // keep a ref copy of mealPlan to compare against incoming remote updates
+    const mealPlanRef = { current: mealPlan } as { current: DayPlan[] };
+    // flag to indicate we're applying a remote update (skip writes while true)
+    const remoteMealPlanUpdateRef = { current: false } as { current: boolean };
+    // keep these refs in outer scope by attaching to window for access in callbacks
+    (window as any).__mealPlanRef = mealPlanRef;
+    (window as any).__remoteMealPlanUpdateRef = remoteMealPlanUpdateRef;
+    (async () => {
+      try {
+        const q = query(collection(db, 'households'), where('memberIds', 'array-contains', user.id));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          const data = d.data();
+          setHousehold(prev => ({ id: d.id, ...(data as any) } as Household));
+        }
+      } catch (err) {
+        console.error('Error fetching households for user', err);
+      }
+    })();
+  }, [user?.id]);
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    let unsubUserInventory: any = null, unsubHouseholdInventory: any = null, unsubShopping: any = null, unsubRecipes: any = null, unsubMealPlan: any = null, unsubUserSaved: any = null, unsubUserMealPlan: any = null;
     import('firebase/firestore').then(({ collection, onSnapshot }) => {
+      if (!active) return; // effect was cleaned up before import resolved
       // Always listen to user's own inventory
       unsubUserInventory = onSnapshot(
         collection(db, 'users', user.id, 'inventory'),
@@ -213,8 +242,9 @@ const unsubscribe = onSnapshot(q, snapshot => {
         }
       );
       // If in a household, listen to household data
-      if (household?.id) {
-        unsubHouseholdInventory = onSnapshot(
+      if (household?.id && isHouseholdMember(household, user)) {
+        let _unsubHouseholdInventory: any = null;
+        _unsubHouseholdInventory = onSnapshot(
           collection(db, 'households', household.id, 'inventory'),
           snapshot => {
             // Optionally, merge or display household inventory if needed
@@ -222,9 +252,15 @@ const unsubscribe = onSnapshot(q, snapshot => {
           (error) => {
             console.error('Household inventory listener error:', error);
             addToast('Unable to read household inventory (permission issue).', 'error');
+            try { _unsubHouseholdInventory && _unsubHouseholdInventory(); } catch(e) {}
+            if (householdUnsubsRef.current) householdUnsubsRef.current.inventory = null;
           }
         );
-        unsubShopping = onSnapshot(
+        unsubHouseholdInventory = _unsubHouseholdInventory;
+        // store unsub so we can cancel immediately if membership changes
+        householdUnsubsRef.current.inventory = unsubHouseholdInventory;
+        let _unsubShopping: any = null;
+        _unsubShopping = onSnapshot(
           collection(db, 'households', household.id, 'shoppingList'),
           snapshot => {
             const items: ShoppingItem[] = [];
@@ -234,9 +270,14 @@ const unsubscribe = onSnapshot(q, snapshot => {
           (error) => {
             console.error('Household shopping listener error:', error);
             addToast('Unable to read household shopping list (permission issue).', 'error');
+            try { _unsubShopping && _unsubShopping(); } catch(e) {}
+            if (householdUnsubsRef.current) householdUnsubsRef.current.shopping = null;
           }
         );
-        unsubRecipes = onSnapshot(
+        unsubShopping = _unsubShopping;
+        householdUnsubsRef.current.shopping = unsubShopping;
+        let _unsubRecipes: any = null;
+        _unsubRecipes = onSnapshot(
           collection(db, 'households', household.id, 'savedRecipes'),
           snapshot => {
             const items: SavedRecipe[] = [];
@@ -246,8 +287,12 @@ const unsubscribe = onSnapshot(q, snapshot => {
           (error) => {
             console.error('Household savedRecipes listener error:', error);
             addToast('Unable to read household saved recipes (permission issue).', 'error');
+            try { _unsubRecipes && _unsubRecipes(); } catch(e) {}
+            if (householdUnsubsRef.current) householdUnsubsRef.current.recipes = null;
           }
         );
+        unsubRecipes = _unsubRecipes;
+        householdUnsubsRef.current.recipes = unsubRecipes;
         // Listen only to the next 7 days of the household mealPlan (range query)
         import('firebase/firestore').then(({ collection: _collection, onSnapshot: _onSnapshot, query: _query, where: _where, orderBy: _orderBy, Timestamp: _Timestamp }) => {
           const start = new Date(); start.setHours(0,0,0,0);
@@ -258,40 +303,137 @@ const unsubscribe = onSnapshot(q, snapshot => {
             _where('date', '<', _Timestamp.fromDate(end)),
             _orderBy('date')
           );
-          unsubMealPlan = _onSnapshot(
+          let _unsubMealPlan: any = null;
+          _unsubMealPlan = _onSnapshot(
             q,
             snapshot => {
-              const daysMap: Record<string, DayPlan> = {};
-              snapshot.forEach(d => {
-                const data: any = d.data();
-                const iso = data?.date?.toDate ? data.date.toDate().toISOString().slice(0,10) : d.id;
-                daysMap[iso] = { date: iso, dayName: new Date(iso).toLocaleDateString(undefined, { weekday: 'long' }), meals: data.meals || [] };
-              });
-              const keys = next7DateKeys(start);
-              const result: DayPlan[] = keys.map(k => daysMap[k] || { date: k, dayName: new Date(k).toLocaleDateString(undefined, { weekday: 'long' }), meals: [] });
-              setMealPlan(result);
+              try {
+                // If we recently performed local writes, skip processing the incoming snapshot
+                if ((window as any).__writingMealPlan) {
+                  console.debug('Skipping mealPlan snapshot because local write in progress');
+                  return;
+                }
+
+                const daysMap: Record<string, DayPlan> = {};
+                snapshot.forEach(d => {
+                  const data: any = d.data();
+                  // Ignore documents that were last modified by this client to avoid echoing our own writes
+                  if (data?.lastModifiedBy && data.lastModifiedBy === (localStorage.getItem('clientId') || '')) {
+                    return; // skip
+                  }
+                  const iso = data?.date?.toDate ? data.date.toDate().toISOString().slice(0,10) : d.id;
+                  daysMap[iso] = { date: iso, dayName: new Date(iso).toLocaleDateString(undefined, { weekday: 'long' }), meals: data.meals || [] };
+                });
+
+                const keys = next7DateKeys();
+                const result: DayPlan[] = keys.map(k => daysMap[k] || { date: k, dayName: new Date(k).toLocaleDateString(undefined, { weekday: 'long' }), meals: [] });
+
+                const prev = (window as any).__mealPlanRef?.current || [];
+                const prevJson = JSON.stringify(prev || []);
+                const newJson = JSON.stringify(result || []);
+                if (prevJson !== newJson) {
+                  // mark remote update to avoid immediate write-back
+                  (window as any).__remoteMealPlanUpdateRef.current = true;
+                  setMealPlan(result);
+                  // clear flag shortly after to allow future writes
+                  setTimeout(() => { (window as any).__remoteMealPlanUpdateRef.current = false; }, 800);
+                }
+              } catch (e) {
+                console.error('Error processing mealPlan snapshot:', e);
+                // best-effort apply
+                try { setMealPlan([]); } catch (_) {}
+              }
             },
             (error) => {
               console.error('Household mealPlan listener error:', error);
               addToast('Unable to read household meal plan (permission issue).', 'error');
+              try { _unsubMealPlan && _unsubMealPlan(); } catch(e) {}
+              if (householdUnsubsRef.current) householdUnsubsRef.current.mealPlan = null;
             }
           );
+          unsubMealPlan = _unsubMealPlan;
+          householdUnsubsRef.current.mealPlan = unsubMealPlan;
         });
       }
+      // Always listen to user's saved recipes (used when not in a household)
+      let _unsubUserSaved: any = null;
+      _unsubUserSaved = onSnapshot(
+        collection(db, 'users', user.id, 'savedRecipes'),
+        snapshot => {
+          const items: SavedRecipe[] = [];
+          snapshot.forEach(doc => items.push(doc.data() as SavedRecipe));
+          // Only apply user's saved recipes when not viewing a household's savedRecipes
+          if (!household?.id || !isHouseholdMember(household, user)) setSavedRecipes(items);
+        },
+        (error) => {
+          console.error('User savedRecipes listener error:', error);
+          // don't spam the user; only show toast on permission issues
+          if ((error as any)?.code === 'permission-denied') addToast('Unable to read your saved recipes (permission denied).', 'error');
+          try { _unsubUserSaved && _unsubUserSaved(); } catch(e) {}
+        }
+      );
+      unsubUserSaved = _unsubUserSaved;
+      // Listen to user's personal mealPlan (fallback when not in household)
+      let _unsubUserMealPlan: any = null;
+      _unsubUserMealPlan = onSnapshot(
+        collection(db, 'users', user.id, 'mealPlan'),
+        snapshot => {
+          const daysMap: Record<string, DayPlan> = {};
+          snapshot.forEach(d => {
+            const data: any = d.data();
+            const iso = d.id;
+            daysMap[iso] = { date: iso, dayName: new Date(iso).toLocaleDateString(undefined, { weekday: 'long' }), meals: data.meals || [] };
+          });
+          // Only apply when not in a household
+          if (!household?.id || !isHouseholdMember(household, user)) {
+            const keys = next7DateKeys();
+            const result: DayPlan[] = keys.map(k => daysMap[k] || { date: k, dayName: new Date(k).toLocaleDateString(undefined, { weekday: 'long' }), meals: [] });
+            setMealPlan(result);
+          }
+        },
+        (error) => {
+          console.error('User mealPlan listener error:', error);
+          if ((error as any)?.code === 'permission-denied') addToast('Unable to read your meal plan (permission denied).', 'error');
+          try { _unsubUserMealPlan && _unsubUserMealPlan(); } catch(e) {}
+        }
+      );
+      unsubUserMealPlan = _unsubUserMealPlan;
     });
     return () => {
-      if (unsubUserInventory) unsubUserInventory();
-      if (unsubHouseholdInventory) unsubHouseholdInventory();
-      if (unsubShopping) unsubShopping();
-      if (unsubRecipes) unsubRecipes();
-      if (unsubMealPlan) unsubMealPlan();
+      // mark inactive so pending import.then won't attach listeners
+      active = false;
+      if (unsubUserInventory) try { unsubUserInventory(); } catch (e) {}
+      if (unsubHouseholdInventory) try { unsubHouseholdInventory(); } catch (e) {}
+      if (unsubShopping) try { unsubShopping(); } catch (e) {}
+      if (unsubRecipes) try { unsubRecipes(); } catch (e) {}
+      if (unsubMealPlan) try { unsubMealPlan(); } catch (e) {}
+      if (unsubUserSaved) try { unsubUserSaved(); } catch (e) {}
+      if (unsubUserMealPlan) try { unsubUserMealPlan(); } catch (e) {}
+      // clear stored household unsub refs
+      try { householdUnsubsRef.current.inventory && householdUnsubsRef.current.inventory(); } catch(e) {}
+      try { householdUnsubsRef.current.shopping && householdUnsubsRef.current.shopping(); } catch(e) {}
+      try { householdUnsubsRef.current.recipes && householdUnsubsRef.current.recipes(); } catch(e) {}
+      try { householdUnsubsRef.current.mealPlan && householdUnsubsRef.current.mealPlan(); } catch(e) {}
+      householdUnsubsRef.current.inventory = null;
+      householdUnsubsRef.current.shopping = null;
+      householdUnsubsRef.current.recipes = null;
+      householdUnsubsRef.current.mealPlan = null;
     };
   }, [user?.id, household?.id]);
 
   // Write changes to Firestore user and household collections individually (no batch)
   useEffect(() => {
     if (!user?.id) return;
+    // If we are applying a remote mealPlan update, skip writing back to Firestore to avoid loops
+    if ((window as any).__remoteMealPlanUpdateRef?.current) {
+      console.debug('Write effect skipped due to remoteMealPlanUpdateRef flag');
+      return;
+    }
+    console.debug('Firestore write effect started', { clientId, householdId: household?.id, inventoryLen: inventory.length, savedRecipesLen: savedRecipes.length, mealPlanLen: mealPlan.length });
     import('firebase/firestore').then(async ({ setDoc, doc: fsDoc }) => {
+      // mark that we're performing a local write to mealPlan/savedRecipes so snapshots
+      // that reflect our own writes can be ignored to avoid feedback loops
+      (window as any).__writingMealPlan = true;
       try {
         // Always write inventory to user's collection
         const userWrites = inventory.map(item => (
@@ -306,7 +448,10 @@ const unsubscribe = onSnapshot(q, snapshot => {
         });
 
         // If in a household, also write to household collections
-        if (household?.id) {
+        console.debug('Checking household write permission', { householdId: household?.id, isMember: isHouseholdMember(household, user), blockedUntil: (window as any).__householdWriteBlockedUntil });
+        const now = Date.now();
+        const blockedUntil = (window as any).__householdWriteBlockedUntil || 0;
+        if (household?.id && isHouseholdMember(household, user) && now >= blockedUntil) {
           const householdWrites: Promise<any>[] = [];
           inventory.forEach(item => {
             householdWrites.push(
@@ -323,17 +468,68 @@ const unsubscribe = onSnapshot(q, snapshot => {
             const docId = item.date; // expected 'YYYY-MM-DD'
             const payload: any = {
               date: Timestamp.fromDate(new Date(item.date)),
-              meals: item.meals || []
+              meals: item.meals || [],
+              lastModifiedBy: clientId,
+              lastModifiedAt: serverTimestamp()
             };
             householdWrites.push(
               setDoc(fsDoc(db, 'households', household.id, 'mealPlan', docId), payload, { merge: true }).catch(err => ({ err, path: `households/${household.id}/mealPlan/${docId}` }))
             );
           });
+          // Also save user's personal mealPlan documents so non-household users persist their plan
+          mealPlan.forEach(item => {
+            const docId = item.date;
+            const payload: any = { date: Timestamp.fromDate(new Date(item.date)), meals: item.meals || [], lastModifiedBy: clientId, lastModifiedAt: serverTimestamp() };
+            householdWrites.push(
+              setDoc(fsDoc(db, 'users', user.id, 'mealPlan', docId), payload, { merge: true }).catch(err => ({ err, path: `users/${user.id}/mealPlan/${docId}` }))
+            );
+          });
           const hResults = await Promise.allSettled(householdWrites);
+          console.debug('Household write results', hResults);
+          // If we get repeated permission errors, block household writes briefly to avoid tight loops
+          let sawPermissionError = false;
           hResults.forEach((res, idx) => {
-            if (res.status === 'rejected' || (res.status === 'fulfilled' && (res.value as any)?.err)) {
+            const maybeErr = (res.status === 'fulfilled' ? (res.value as any)?.err : (res as any).reason) || null;
+            if (maybeErr) {
               console.error('Household write failed:', res);
               addToast('Failed to save some household data (permission or network issue).', 'error');
+              if ((maybeErr as any)?.code === 'permission-denied' || String((maybeErr as any)?.message || '').toLowerCase().includes('permission')) {
+                sawPermissionError = true;
+              }
+            }
+          });
+          if (sawPermissionError) {
+            // block further household writes for 30s
+            (window as any).__householdWriteBlockedUntil = Date.now() + 30000;
+            console.warn('Blocking household writes for 30s due to permission errors');
+          }
+        }
+        else {
+          // Not in household: save mealPlan to user's own collection
+          const userMealWrites: Promise<any>[] = [];
+          mealPlan.forEach(item => {
+            const docId = item.date;
+            const payload: any = { date: Timestamp.fromDate(new Date(item.date)), meals: item.meals || [], lastModifiedBy: clientId, lastModifiedAt: serverTimestamp() };
+            userMealWrites.push(setDoc(fsDoc(db, 'users', user.id, 'mealPlan', docId), payload, { merge: true }).catch(err => ({ err, path: `users/${user.id}/mealPlan/${docId}` })));
+          });
+          // Also persist savedRecipes to the user's personal collection when not in a household
+          const userSavedWrites: Promise<any>[] = [];
+          savedRecipes.forEach(item => {
+            userSavedWrites.push(setDoc(fsDoc(db, 'users', user.id, 'savedRecipes', item.id), item).catch(err => ({ err, path: `users/${user.id}/savedRecipes/${item.id}` })));
+          });
+          const uResults = await Promise.allSettled(userMealWrites);
+          console.debug('User mealPlan write results', uResults);
+          uResults.forEach((res) => {
+            if (res.status === 'rejected' || (res.status === 'fulfilled' && (res.value as any)?.err)) {
+              console.error('User mealPlan write failed:', res);
+              addToast('Failed to save your meal plan (permission or network issue).', 'error');
+            }
+          });
+          const sResults = await Promise.allSettled(userSavedWrites);
+          sResults.forEach((res, idx) => {
+            if (res.status === 'rejected' || (res.status === 'fulfilled' && (res.value as any)?.err)) {
+              console.error('User savedRecipes write failed:', res);
+              addToast(`Failed to save recipe: ${savedRecipes[idx]?.title || savedRecipes[idx]?.id}`, 'error');
             }
           });
         }
@@ -341,12 +537,48 @@ const unsubscribe = onSnapshot(q, snapshot => {
         console.error('Error during Firestore writes:', err);
         addToast('Error saving data to Firestore.', 'error');
       }
+      finally {
+        // clear write-in-progress flag after a short delay to let snapshot events arrive
+        setTimeout(() => { (window as any).__writingMealPlan = false; }, 400);
+      }
     });
   }, [user?.id, household?.id, inventory, savedRecipes, mealPlan]);
 
+  // Immediately unsubscribe from household listeners when the user is no longer a member
+  useEffect(() => {
+    const member = isHouseholdMember(household, user);
+    if (!member) {
+      const refs = householdUnsubsRef.current;
+      if (refs.inventory) {
+        try { refs.inventory(); } catch (e) {}
+        refs.inventory = null;
+      }
+      if (refs.shopping) {
+        try { refs.shopping(); } catch (e) {}
+        refs.shopping = null;
+      }
+      if (refs.recipes) {
+        try { refs.recipes(); } catch (e) {}
+        refs.recipes = null;
+      }
+      if (refs.mealPlan) {
+        try { refs.mealPlan(); } catch (e) {}
+        refs.mealPlan = null;
+      }
+      console.debug('Unsubscribed household listeners because user is not a member');
+    }
+  }, [household?.id, user?.id]);
+
+  // Keep a global-ref updated so snapshot callbacks can compare against latest local state
+  useEffect(() => {
+    (window as any).__mealPlanRef = (window as any).__mealPlanRef || { current: mealPlan };
+    (window as any).__mealPlanRef.current = mealPlan;
+    (window as any).__remoteMealPlanUpdateRef = (window as any).__remoteMealPlanUpdateRef || { current: false };
+  }, [mealPlan]);
+
   // Debounced individual writes for shopping list
   useEffect(() => {
-    if (!household?.id) return;
+    if (!household?.id || !isHouseholdMember(household, user)) return;
     const timeout = setTimeout(async () => {
       try {
         const { setDoc, doc: fsDoc } = await import('firebase/firestore');
@@ -370,46 +602,15 @@ const unsubscribe = onSnapshot(q, snapshot => {
 
   // Persistence
   useEffect(() => { localStorage.setItem('user', JSON.stringify(user)); }, [user]);
-  useEffect(() => {
-    if (!user || !household?.id) return;
-    const unsubscribe = onSnapshot(
-      doc(db, "households", household.id),
-      (docSnap) => {
-        const data = docSnap.data();
-        if (data && data.inventory) {
-          setInventory(data.inventory);
-        }
-      },
-      (error) => {
-        console.error('Household doc snapshot error:', error);
-        addToast('Unable to load household document (permission issue).', 'error');
-      }
-    );
-    return () => unsubscribe();
-  }, [user, household?.id]);
-  useEffect(() => {
-    if (!user || !household?.id) return;
-    const unsubscribe = onSnapshot(
-      doc(db, "households", household.id),
-      (docSnap) => {
-        const data = docSnap.data();
-        if (data) {
-          if (data.inventory) setInventory(data.inventory);
-          if (data.shoppingList) setShoppingList(data.shoppingList);
-          if (data.savedRecipes) setSavedRecipes(data.savedRecipes);
-          if (data.mealPlan) setMealPlan(data.mealPlan);
-        }
-      },
-      (error) => {
-        console.error('Household doc snapshot error (detailed):', error);
-        addToast('Unable to load household data (permission issue).', 'error');
-      }
-    );
-    return () => unsubscribe();
-  }, [user, household?.id]);
+  // Note: household subcollections (inventory, shoppingList, savedRecipes, mealPlan)
+  // are listened to individually (collection listeners) above. Avoid listening to
+  // the aggregate `households/{id}` doc here to prevent conflicts where both the
+  // doc field and subcollection listeners try to overwrite `mealPlan`/`savedRecipes`.
   
   // Listen to all ratings from Firestore (for Community tab - shared across all users)
+  // Only subscribe after Firebase Auth has resolved to avoid permission errors on startup
   useEffect(() => {
+    if (!user?.id) return; // wait for authenticated user
     const unsubscribe = onSnapshot(collection(db, 'ratings'), (snapshot) => {
       const allRatings: RecipeRating[] = [];
       snapshot.forEach((doc) => {
@@ -421,19 +622,24 @@ const unsubscribe = onSnapshot(q, snapshot => {
           comment: data.comment,
           userName: data.userName,
           date: data.date,
-          userAvatar: data.userAvatar
+          userAvatar: data.userAvatar,
+          ingredients: data.ingredients || data.recipe?.ingredients || [],
+          instructions: data.instructions || data.recipe?.instructions || [],
+          recipe: data.recipe || undefined
         } as RecipeRating);
       });
-      // Update with all ratings from Firestore (whether empty or populated)
       setRatings(allRatings);
     }, (error) => {
       console.error('Error loading ratings from Firestore:', error);
-      // Fall back to localStorage if Firestore fails
+      // Show a user-friendly toast on permission errors and fall back to local cache
+      if ((error as any)?.code === 'permission-denied' || (error as any)?.message?.toLowerCase?.().includes('permission')) {
+        addToast('Unable to read community ratings (permission denied).', 'error');
+      }
       const saved = localStorage.getItem('ratings');
       if (saved) setRatings(JSON.parse(saved));
     });
     return () => unsubscribe();
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => { localStorage.setItem('mealPlan', JSON.stringify(mealPlan)); }, [mealPlan]);
   useEffect(() => { localStorage.setItem('household', JSON.stringify(household)); }, [household]);
@@ -624,22 +830,139 @@ const unsubscribe = onSnapshot(q, snapshot => {
       dateSaved: new Date().toLocaleDateString(),
       imagePlaceholder: `hsl(${Math.random() * 360}, 70%, 40%)`
     };
+    // update local state immediately for optimistic UI
     setSavedRecipes(prev => [newSaved, ...prev]);
     logEvent(analytics, 'save_recipe', { title: recipe.title });
-    alert("Recipe saved to favorites!");
+    // Persist to Firestore: household if member, otherwise user's personal savedRecipes
+    if (!user?.id) {
+      addToast('Please sign in to save recipes.', 'error');
+      return;
+    }
+    import('firebase/firestore').then(async ({ setDoc, doc: fsDoc }) => {
+      try {
+        if (household?.id && isHouseholdMember(household, user)) {
+          await setDoc(fsDoc(db, 'households', household.id, 'savedRecipes', newSaved.id), newSaved, { merge: true });
+        } else {
+          await setDoc(fsDoc(db, 'users', user.id, 'savedRecipes', newSaved.id), newSaved, { merge: true });
+        }
+        addToast('Recipe saved to favorites!', 'info');
+      } catch (err) {
+        console.error('Failed to persist saved recipe:', err);
+        addToast('Failed to save recipe to server.', 'error');
+      }
+    }).catch(err => {
+      console.error('Firestore import failed for saveRecipe:', err);
+      addToast('Failed to save recipe (internal error).', 'error');
+    });
+  };
+
+  // Confirmation modal state for marking recipes as made
+  const [confirmMark, setConfirmMark] = useState<null | { recipe: StructuredRecipe; impacts: Array<{ idx: number; itemName: string; cur: number; amt: number; newQty: number }>; }>(null);
+
+  // Handler to compute impacts and either ask for confirmation or apply change
+  const handleMarkAsMade = (recipe: StructuredRecipe) => {
+    if (!recipe || !recipe.ingredients || recipe.ingredients.length === 0) {
+      addToast('No ingredients found for this recipe.', 'error');
+      return;
+    }
+
+    const updated = inventory.map(item => ({ ...item }));
+    const parseAmount = (text: string) => {
+      if (!text) return 1;
+      const frac = text.match(/(\d+)\s*\/\s*(\d+)/);
+      if (frac) {
+        const n = parseFloat(frac[1]);
+        const d = parseFloat(frac[2]) || 1;
+        return n / d;
+      }
+      const num = text.match(/(\d+(?:\.\d+)?)/);
+      if (num) return parseFloat(num[0]);
+      return 1;
+    };
+
+    const impacts: Array<{ idx: number; itemName: string; cur: number; amt: number; newQty: number }> = [];
+
+    recipe.ingredients.forEach(ing => {
+      const ingLower = (ing || '').toLowerCase();
+      let idx = -1;
+      for (let i = 0; i < updated.length; i++) {
+        try { if (ingLower.includes(updated[i].item.toLowerCase())) { idx = i; break; } } catch (e) {}
+      }
+      if (idx === -1) {
+        for (let i = 0; i < updated.length; i++) {
+          const invName = updated[i].item.toLowerCase();
+          const words = invName.split(/\s+/).filter(Boolean);
+          for (const w of words) {
+            if (w.length > 2 && ingLower.includes(w)) { idx = i; break; }
+          }
+          if (idx !== -1) break;
+        }
+      }
+      if (idx !== -1) {
+        const amt = parseAmount(ing);
+        const cur = parseFloat(updated[idx].quantity_estimate || '0') || 0;
+        const newQty = Math.max(0, cur - amt);
+        impacts.push({ idx, itemName: updated[idx].item, cur, amt, newQty });
+      }
+    });
+
+    // Determine whether confirmation is needed: any large subtraction or depleting item
+    const needsConfirm = impacts.some(i => i.amt >= 5 || i.newQty <= 0 || (i.cur > 0 && ((i.cur - i.newQty) / i.cur) > 0.5));
+    if (needsConfirm) {
+      setConfirmMark({ recipe, impacts });
+      return;
+    }
+
+    // Apply immediately with undo support
+    const prevSnapshot = inventory.map(i => ({ ...i }));
+    const newInventory = updated.map(i => ({ ...i }));
+    impacts.forEach(imp => {
+      newInventory[imp.idx].quantity_estimate = String(Math.round(imp.newQty));
+    });
+    setInventory(newInventory);
+
+    addToast('Marked recipe as made — undo', 'info', 8000, 'Undo', () => {
+      setInventory(prevSnapshot);
+      addToast('Undo complete — pantry restored.', 'info', 3000);
+    });
   };
 
   const handleAddRating = async (rating: RecipeRating) => {
-    // Save to local state
-    setRatings(prev => [rating, ...prev]);
-    
-    // Save to Firestore (shared database)
+    // Try to enrich rating with recipe details (ingredients/instructions) from savedRecipes or persisted result
+    const findRecipeDetails = () => {
+      const title = rating.recipeTitle?.toLowerCase?.();
+      if (!title) return null;
+      const byTitle = (r: any) => (r?.title && String(r.title).toLowerCase() === title);
+      const foundSaved = savedRecipes.find(byTitle as any) as any | undefined;
+      if (foundSaved) return foundSaved;
+      if (persistedRecipeResult && Array.isArray(persistedRecipeResult.recipes)) {
+        const foundResp = persistedRecipeResult.recipes.find((r: any) => String(r.title).toLowerCase() === title);
+        if (foundResp) return foundResp;
+      }
+      return null;
+    };
+    const details = findRecipeDetails();
+    const enriched: any = { ...rating };
+    if (details) {
+      if (Array.isArray(details.ingredients)) enriched.ingredients = details.ingredients;
+      if (Array.isArray(details.instructions)) enriched.instructions = details.instructions;
+      enriched.recipe = details;
+    }
+
+    // Save to local state (with possible enrichment)
+    setRatings(prev => [enriched as RecipeRating, ...prev]);
+
+    // Save to Firestore (shared database) with enrichment
     try {
-      await addDoc(collection(db, 'ratings'), {
+      const payload: any = {
         ...rating,
         userId: user?.id || 'anonymous',
-        timestamp: new Date().toISOString()
-      });
+        timestamp: new Date().toISOString(),
+      };
+      if (enriched.ingredients) payload.ingredients = enriched.ingredients;
+      if (enriched.instructions) payload.instructions = enriched.instructions;
+      if (enriched.recipe) payload.recipe = enriched.recipe;
+      await addDoc(collection(db, 'ratings'), payload);
     } catch (error) {
       console.error('Error saving rating to Firestore:', error);
       // Rating is still saved locally
@@ -708,11 +1031,54 @@ const unsubscribe = onSnapshot(q, snapshot => {
   return (
     <>
       {showNotificationsModal && <NotificationModal />}
+      {confirmMark && (
+        <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center">
+          <div className="bg-white dark:bg-theme-primary text-theme-primary dark:text-theme-secondary rounded-xl p-6 max-w-lg w-full shadow-2xl">
+            <h3 className="text-lg font-bold mb-2">Confirm Mark as Made</h3>
+            <p className="mb-4">This will subtract the following quantities from your pantry. Proceed?</p>
+            <div className="mb-4 max-h-48 overflow-y-auto">
+              {confirmMark.impacts.map((imp, i) => (
+                <div key={i} className="flex justify-between border-b py-2">
+                  <div>
+                    <div className="font-medium">{imp.itemName}</div>
+                    <div className="text-xs opacity-70">Current: {imp.cur} • Subtract: {imp.amt}</div>
+                  </div>
+                  <div className="text-sm font-bold">After: {imp.newQty}</div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmMark(null)} className="px-4 py-2 rounded bg-gray-200">Cancel</button>
+              <button onClick={() => {
+                // apply
+                const prevSnapshot = inventory.map(i => ({ ...i }));
+                const newInventory = inventory.map(i => ({ ...i }));
+                confirmMark.impacts.forEach(imp => {
+                  newInventory[imp.idx].quantity_estimate = String(Math.round(imp.newQty));
+                });
+                setInventory(newInventory);
+                setConfirmMark(null);
+                addToast('Marked recipe as made — undo', 'info', 8000, 'Undo', () => {
+                  setInventory(prevSnapshot);
+                  addToast('Undo complete — pantry restored.', 'info', 3000);
+                });
+              }} className="px-4 py-2 rounded bg-[var(--accent-color)] text-white">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Toasts */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map(t => (
           <div key={t.id} className={`px-4 py-2 rounded-lg shadow-md text-sm max-w-xs ${t.type === 'error' ? 'bg-red-700 text-white' : 'bg-gray-800 text-white'}`}>
-            {t.message}
+            <div className="flex justify-between items-center gap-2">
+              <div className="flex-1">{t.message}</div>
+              {t.actionLabel && t.action && (
+                <button onClick={() => { try { t.action && t.action(); } finally { setToasts(prev => prev.filter(x => x.id !== t.id)); } }} className="ml-3 underline text-sm font-bold">
+                  {t.actionLabel}
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -760,24 +1126,7 @@ const unsubscribe = onSnapshot(q, snapshot => {
                   {settings.theme.mode === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
               {/* Dev: create test household button when running locally */}
-              {window.location.hostname === 'localhost' && (
-                <button
-                  onClick={createTestHousehold}
-                  disabled={isCreatingHousehold}
-                  className="ml-2 px-3 py-1 rounded bg-amber-600 text-white text-sm"
-                >
-                  {isCreatingHousehold ? 'Creating...' : 'Create Test Household'}
-                </button>
-              )}
-              {window.location.hostname === 'localhost' && (
-                <button
-                  onClick={() => inviteTestEmail('chrisj221986@gmail.com')}
-                  disabled={isInvitingTest}
-                  className="ml-2 px-3 py-1 rounded bg-amber-500 text-white text-sm"
-                >
-                  {isInvitingTest ? 'Inviting...' : 'Invite Test Email'}
-                </button>
-              )}
+              {/* Dev buttons removed (create test household / invite test email) */}
           </div>
         </header>
         {/* Main Content */}
@@ -803,6 +1152,9 @@ const unsubscribe = onSnapshot(q, snapshot => {
                 setShoppingList(prev => [...prev, ...newItems]);
                 setActiveTab(Tab.SHOPPING);
               }}
+              onAddToPlan={handleAddToPlan}
+              onSaveRecipe={handleSaveRecipe}
+              onMarkAsMade={handleMarkAsMade}
             />
           )}
           {activeTab === Tab.SHOPPING && (
@@ -844,6 +1196,7 @@ const unsubscribe = onSnapshot(q, snapshot => {
               <RecipeFinder 
                   onAddToPlan={handleAddToPlan} 
                   onSaveRecipe={handleSaveRecipe}
+                  onMarkAsMade={handleMarkAsMade}
                   inventory={inventory}
                   ratings={ratings}
                   onRate={handleAddRating}
@@ -858,8 +1211,9 @@ const unsubscribe = onSnapshot(q, snapshot => {
           )}
           {activeTab === Tab.COMMUNITY && (
               <Community 
-                  ratings={ratings} 
-                  onAddToPlan={handleAddToPlan}
+                ratings={ratings} 
+                onAddToPlan={handleAddToPlan}
+                onSaveRecipe={handleSaveRecipe}
               />
           )}
           {activeTab === Tab.SETTINGS && (

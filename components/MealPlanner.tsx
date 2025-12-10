@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2 } from 'lucide-react';
 import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe } from '../types';
+import RecipeModal from './RecipeModal';
 
 interface MealPlannerProps {
   mealPlan: DayPlan[];
   setMealPlan: React.Dispatch<React.SetStateAction<DayPlan[]>>;
   inventory: PantryItem[];
   addToShoppingList: (items: string[]) => void;
+  onAddToPlan?: (recipe: StructuredRecipe) => void;
+  onSaveRecipe?: (recipe: StructuredRecipe) => void;
+  onMarkAsMade?: (recipe: StructuredRecipe) => void;
 }
 
-export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList }) => {
+export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade }) => {
     // List of staple items to ignore
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
   const [draggedMeal, setDraggedMeal] = useState<{ dayIndex: number, mealIndex: number } | null>(null);
@@ -143,27 +147,17 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
       </div>
       {/* Modal for full recipe details */}
       {showRecipeModal && modalRecipe && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowRecipeModal(false)}>
-          <div className="bg-theme-primary rounded-2xl shadow-2xl p-8 max-w-lg w-full relative" onClick={e => e.stopPropagation()}>
-            <button className="absolute top-3 right-3 text-theme-secondary opacity-50 hover:opacity-100" onClick={() => setShowRecipeModal(false)}>
-              &times;
-            </button>
-            <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{modalRecipe.title}</h2>
-            <p className="mb-4 text-theme-secondary opacity-70">{modalRecipe.description}</p>
-            <div className="mb-4">
-              <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Ingredients</h4>
-              <ul className="list-disc list-inside text-theme-secondary opacity-80">
-                {modalRecipe.ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Instructions</h4>
-              <ol className="list-decimal list-inside text-theme-secondary opacity-80 space-y-1">
-                {modalRecipe.instructions.map((step, i) => <li key={i}>{step}</li>)}
-              </ol>
-            </div>
-          </div>
-        </div>
+        <RecipeModal
+          recipe={modalRecipe}
+          isOpen={showRecipeModal}
+          onClose={() => setShowRecipeModal(false)}
+          onAddToPlan={onAddToPlan}
+          onSaveRecipe={onSaveRecipe}
+          onMarkAsMade={onMarkAsMade}
+          showSaveButton={true}
+          showMarkAsMade={true}
+          showAddToPlan={true}
+        />
       )}
     </div>
   );

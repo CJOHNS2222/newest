@@ -1,15 +1,10 @@
 import React, { useState } from 'react';
 import { User, Household, Member } from '../types';
-<<<<<<< HEAD
-import { Users, Mail, Plus, X, UserCircle2, Send } from 'lucide-react';
+import { Users, Mail, Plus, X, Send } from 'lucide-react';
 import { sendHouseholdInvitation } from '../services/emailService';
 import { addMemberToHousehold } from '../services/householdService';
 import { db } from '../firebaseConfig';
-import { doc, updateDoc, arrayUnion, deleteField } from 'firebase/firestore';
-=======
-import { Users, Mail, Plus, X } from 'lucide-react';
-import { getFunctions, httpsCallable } from "firebase/functions";
->>>>>>> 83c3efa68351cacc8dfc1f64af3dc3f190a40c93
+import { doc, updateDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 
 interface HouseholdManagerProps {
   user: User;
@@ -20,7 +15,6 @@ interface HouseholdManagerProps {
 
 export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, household, setHousehold, onClose }) => {
   const [inviteEmail, setInviteEmail] = useState('');
-<<<<<<< HEAD
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteMessage, setInviteMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -72,31 +66,12 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       }
 
       // Update local state after successful Firebase save
-=======
-  const [isInviting, setIsInviting] = useState(false);
-
-  const handleInvite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inviteEmail || isInviting) return;
-
-    setIsInviting(true);
-    try {
-      const functions = getFunctions();
-      const inviteMember = httpsCallable(functions, 'inviteMember');
-      
-      // The cloud function returns the new member data upon success
-      const result = await inviteMember({ email: inviteEmail, householdId: household.id });
-      const { newMember } = result.data as { newMember: Member };
-
-      // Update the local state with the official member data from the server
->>>>>>> 83c3efa68351cacc8dfc1f64af3dc3f190a40c93
       setHousehold(prev => ({
         ...prev,
         members: [...prev.members, newMember]
       }));
 
       setInviteEmail('');
-<<<<<<< HEAD
       setInviteMessage({
         type: 'success',
         text: emailResult.success 
@@ -118,37 +93,50 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
 
   const removeMember = async (id: string) => {
     const memberToRemove = household.members.find(m => m.id === id);
-    
-      // Update Firebase first
-    if (household.id && memberToRemove) {
+    if (!memberToRemove) return;
+
+    if (household.id) {
       try {
         const householdRef = doc(db, 'households', household.id);
-        // Remove by filtering
         const updatedMembers = household.members.filter(m => m.id !== id);
-        // Also update memberIds for security rules (extract ids where available)
         const updatedMemberIds = updatedMembers.map(m => m.id).filter(Boolean);
+
+        // Update household members
         await updateDoc(householdRef, {
           members: updatedMembers,
           memberIds: updatedMemberIds
         });
-        
-        // Only update local state after Firebase succeeds
+
+        // If no members remain, delete household and its known subcollections
+        if (updatedMembers.length === 0) {
+          const subcollections = ['inventory', 'shoppingList', 'savedRecipes', 'mealPlan', 'notifications'];
+          for (const sub of subcollections) {
+            const colRef = collection(db, 'households', household.id, sub);
+            const snapshot = await getDocs(colRef);
+            for (const docSnap of snapshot.docs) {
+              await deleteDoc(doc(db, 'households', household.id, sub, docSnap.id));
+            }
+          }
+          // Finally delete household document
+          await deleteDoc(householdRef);
+          // Update local state to reflect no household (optional: you might want to close the modal)
+          setHousehold(prev => ({ ...prev, members: [] }));
+          return;
+        }
+
+        // Update local state after successful Firebase update
         setHousehold(prev => ({
           ...prev,
           members: prev.members.filter(m => m.id !== id)
         }));
       } catch (error) {
         console.error('Error removing member from Firebase:', error);
-        // Don't update local state on error - leave it as is
       }
     } else {
-      // Fallback if no Firebase ID (shouldn't happen in normal flow)
-      setHousehold(prev => ({
-        ...prev,
-        members: prev.members.filter(m => m.id !== id)
-      }));
+      // Fallback - update local only
+      setHousehold(prev => ({ ...prev, members: prev.members.filter(m => m.id !== id) }));
     }
-=======
+  };
       console.log("Invitation sent and member added as pending!");
 
     } catch (error) {

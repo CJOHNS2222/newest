@@ -4,12 +4,14 @@ import { searchRecipes } from '../services/geminiService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe } from '../types';
 import { fetchRecipeImage } from '../services/imageService';
 import { RecipeRatingUI } from './RecipeRating';
+import RecipeModal from './RecipeModal';
 import { logEvent } from 'firebase/analytics';
 import { analytics } from '../firebaseConfig';
 
 interface RecipeFinderProps {
     onAddToPlan: (recipe: StructuredRecipe) => void;
     onSaveRecipe: (recipe: StructuredRecipe) => void;
+    onMarkAsMade?: (recipe: StructuredRecipe) => void;
     inventory: PantryItem[];
     ratings: RecipeRating[];
     onRate: (rating: RecipeRating) => void;
@@ -18,7 +20,7 @@ interface RecipeFinderProps {
     setPersistedResult?: (result: RecipeSearchResult | null) => void;
 }
 
-export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, inventory, ratings, onRate, savedRecipes, persistedResult, setPersistedResult }) => {
+export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onMarkAsMade, inventory, ratings, onRate, savedRecipes, persistedResult, setPersistedResult }) => {
         // List of staple items to ignore
         const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     const [activeView, setActiveView] = useState<'search' | 'saved'>('search');
@@ -36,6 +38,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const [searchError, setSearchError] = useState<string | null>(null);
     const [showRecipeModal, setShowRecipeModal] = useState(false);
     const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
+    const [modalIsSavedView, setModalIsSavedView] = useState(false);
 
   const inventoryString = inventory.map(i => i.item).join(', ');
 
@@ -120,10 +123,40 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             }
         }, [result]);
 
+        const openRecipeModal = (recipe: any, isSavedView = false) => {
+            // Normalize recipe shape so modal can safely render instructions/ingredients
+            const normalized: any = { ...recipe };
+            normalized.title = normalized.title || 'Untitled Recipe';
+            if (!Array.isArray(normalized.instructions)) {
+                if (typeof normalized.instructions === 'string') {
+                    // Split on newlines or numbered steps
+                    normalized.instructions = normalized.instructions.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
+                } else if (normalized.instructions && typeof normalized.instructions === 'object') {
+                    // If stored as object with numeric keys, convert to array
+                    normalized.instructions = Object.values(normalized.instructions).map(String).filter(Boolean);
+                } else {
+                    normalized.instructions = [];
+                }
+            }
+            if (!Array.isArray(normalized.ingredients)) {
+                if (typeof normalized.ingredients === 'string') {
+                    normalized.ingredients = normalized.ingredients.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
+                } else if (normalized.ingredients && typeof normalized.ingredients === 'object') {
+                    normalized.ingredients = Object.values(normalized.ingredients).map(String).filter(Boolean);
+                } else {
+                    normalized.ingredients = [];
+                }
+            }
+            setModalRecipe(normalized as StructuredRecipe);
+            setModalIsSavedView(Boolean(isSavedView));
+            setShowRecipeModal(true);
+        };
+
         const renderRecipeCard = (recipe: StructuredRecipe, isSavedView = false) => {
             const ratingInfo = getRatingInfo(recipe.title);
             const isSaved = savedRecipes.some(r => r.title === recipe.title);
-            const imgUrl = imageUrls[recipe.title] || `https://source.unsplash.com/600x400/?${encodeURIComponent(recipe.title.split(' ').slice(0,2).join(','))},food`;
+            const titleKey = recipe.title || 'Untitled Recipe';
+            const imgUrl = imageUrls[titleKey] || `https://source.unsplash.com/600x400/?${encodeURIComponent((titleKey as string).split(' ').slice(0,2).join(','))},food`;
             // Filter out staple items from ingredient list
             const filteredIngredients = recipe.ingredients.filter(ing => {
                 const ingLower = ing.toLowerCase();
@@ -131,7 +164,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             });
 
             return (
-                <div key={recipe.title} className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden group hover:shadow-2xl transition-all mb-6 cursor-pointer" onClick={() => { setModalRecipe(recipe); setShowRecipeModal(true); }}>
+                <div key={titleKey} className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden group hover:shadow-2xl transition-all mb-6 cursor-pointer" onClick={() => openRecipeModal(recipe, isSavedView)}>
                     {/* Recipe Image */}
                     <div className="h-40 relative bg-gray-200 overflow-hidden">
                         <div 
@@ -360,49 +393,17 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
             {/* Modal for full recipe details */}
             {showRecipeModal && modalRecipe && (
-                <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowRecipeModal(false)}>
-                    <div className="bg-theme-primary rounded-2xl shadow-2xl p-0 max-w-lg w-full relative flex flex-col" onClick={e => e.stopPropagation()}>
-                        <button className="sticky top-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-t-2xl flex items-center justify-center hover:bg-red-500 transition-all" onClick={() => setShowRecipeModal(false)}>
-                            CLOSE &times;
-                        </button>
-                        <div className="overflow-y-auto max-h-[70vh] p-8">
-                            <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{modalRecipe.title}</h2>
-                            <p className="mb-4 text-theme-secondary opacity-70">{modalRecipe.description}</p>
-                            <div className="mb-4">
-                                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Ingredients</h4>
-                                <ul className="list-disc list-inside text-theme-secondary opacity-80">
-                                    {modalRecipe.ingredients.filter(ing => {
-                                        const ingLower = ing.toLowerCase();
-                                        return !STAPLES.some(staple => ingLower.includes(staple));
-                                    }).map((ing, i) => <li key={i}>{ing}</li>)}
-                                </ul>
-                            </div>
-                            <div className="mb-6">
-                                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Instructions</h4>
-                                <ol className="list-decimal list-inside text-theme-secondary opacity-80 space-y-1">
-                                    {modalRecipe.instructions.map((step, i) => <li key={i}>{step}</li>)}
-                                </ol>
-                            </div>
-                            <div className="flex gap-3 flex-col">
-                                <button 
-                                    onClick={() => { onAddToPlan(modalRecipe); setShowRecipeModal(false); }}
-                                    className="w-full bg-[var(--accent-color)] text-white font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2"
-                                >
-                                    <Plus className="w-5 h-5" /> Add to Schedule
-                                </button>
-                                <button 
-                                    onClick={() => { onSaveRecipe(modalRecipe); setShowRecipeModal(false); }}
-                                    className="w-full bg-theme-secondary border border-[var(--accent-color)] text-[var(--accent-color)] font-bold py-3 rounded-xl hover:bg-[var(--accent-color)] hover:text-white transition-all flex items-center justify-center gap-2"
-                                >
-                                    <Heart className="w-5 h-5" /> Mark as Made
-                                </button>
-                            </div>
-                        </div>
-                        <button className="sticky bottom-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-b-2xl flex items-center justify-center hover:bg-red-500 transition-all" onClick={() => setShowRecipeModal(false)}>
-                            CLOSE &times;
-                        </button>
-                    </div>
-                </div>
+                <RecipeModal
+                    recipe={modalRecipe}
+                    isOpen={showRecipeModal}
+                    onClose={() => setShowRecipeModal(false)}
+                    onAddToPlan={(r) => { onAddToPlan(r); }}
+                    onSaveRecipe={(r) => { onSaveRecipe(r); }}
+                    onMarkAsMade={(r) => { if (onMarkAsMade) onMarkAsMade(r); }}
+                    showSaveButton={!modalIsSavedView}
+                    showMarkAsMade={true}
+                    showAddToPlan={true}
+                />
             )}
         </>
       )}

@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { Star, Clock, ChefHat, Plus, X } from 'lucide-react';
 import { RecipeRating, StructuredRecipe } from '../types';
+import RecipeModal from './RecipeModal';
 
 interface CommunityProps {
   ratings: RecipeRating[];
   onAddToPlan: (recipe: StructuredRecipe) => void;
+  onSaveRecipe?: (recipe: StructuredRecipe) => void;
 }
 
-export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan }) => {
+export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSaveRecipe }) => {
     // List of staple items to ignore in ingredient display
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
   const [showModal, setShowModal] = useState(false);
@@ -15,21 +17,23 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan }) =>
   
   // Group ratings by recipe title and calculate average
   const recipeStats = ratings.reduce((acc, curr) => {
-    if (!acc[curr.recipeTitle]) {
-      acc[curr.recipeTitle] = {
-        title: curr.recipeTitle,
+    const key = curr.recipeTitle || 'Untitled';
+    if (!acc[key]) {
+      acc[key] = {
+        title: key,
         totalRating: 0,
         count: 0,
         comments: []
       };
     }
-    acc[curr.recipeTitle].totalRating += curr.rating;
-    acc[curr.recipeTitle].count += 1;
-    if (curr.comment) acc[curr.recipeTitle].comments.push(curr);
+    acc[key].totalRating += (typeof curr.rating === 'number' ? curr.rating : 0);
+    acc[key].count += 1;
+    if (curr.comment) acc[key].comments.push(curr);
     return acc;
   }, {} as Record<string, { title: string, totalRating: number, count: number, comments: RecipeRating[] }>);
 
-  const sortedRecipes = Object.values(recipeStats).sort((a, b) => (b.totalRating/b.count) - (a.totalRating/a.count));
+  const sortedRecipes = Object.values(recipeStats).sort((a, b) => (b.totalRating / Math.max(1, b.count)) - (a.totalRating / Math.max(1, a.count)));
+  const [showAll, setShowAll] = useState(false);
 
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
@@ -39,9 +43,9 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan }) =>
       </div>
 
       <div className="space-y-4">
-        {sortedRecipes.map((stat, idx) => {
+        {(showAll ? sortedRecipes : sortedRecipes.slice(0,5)).map((stat, idx) => {
            const avg = (stat.totalRating / stat.count).toFixed(1);
-           const latestComment = stat.comments[0];
+           const latestComment = stat.comments && stat.comments[0] ? stat.comments[0] : null;
            
            return (
              <div 
@@ -52,7 +56,7 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan }) =>
                 {/* Simulated Image Header */}
                 <div className="h-32 bg-gray-200 relative overflow-hidden">
                     <div className="absolute inset-0 flex items-center justify-center text-theme-secondary opacity-10 font-serif text-4xl font-bold bg-theme-primary">
-                        {stat.title.charAt(0)}
+                        {(stat.title && String(stat.title).charAt ? String(stat.title).charAt(0) : '?')}
                     </div>
                      <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-4">
                         <h3 className="text-white font-bold font-serif text-lg leading-tight">{stat.title}</h3>
@@ -72,7 +76,7 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan }) =>
                         <div className="bg-theme-primary p-3 rounded-lg mb-4 border border-theme">
                             <div className="flex items-center gap-2 mb-1">
                                 <div className="w-4 h-4 rounded-full bg-[var(--accent-color)] text-[8px] text-white flex items-center justify-center">
-                                    {latestComment.userName.charAt(0)}
+                                  {(latestComment && latestComment.userName) ? String(latestComment.userName).charAt(0) : '?'}
                                 </div>
                                 <span className="text-xs font-bold text-theme-secondary opacity-80">{latestComment.userName}</span>
                             </div>
@@ -109,60 +113,41 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan }) =>
                 <p>No ratings yet. Be the first to rate a recipe!</p>
              </div>
         )}
-      </div>
-
-      {showModal && selectedRecipe && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowModal(false)}>
-          <div className="bg-theme-primary rounded-2xl shadow-2xl p-0 max-w-lg w-full relative flex flex-col" onClick={e => e.stopPropagation()}>
-            <button className="sticky top-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-t-2xl flex items-center justify-center hover:bg-red-500 transition-all" onClick={() => setShowModal(false)}>
-              CLOSE &times;
-            </button>
-            <div className="overflow-y-auto max-h-[70vh] p-8">
-              <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{selectedRecipe.title}</h2>
-              <div className="mb-4">
-                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Ingredients</h4>
-                <ul className="list-disc list-inside text-theme-secondary opacity-80">
-                  {selectedRecipe.comments.length > 0 && selectedRecipe.comments[0].ingredients
-                    ? selectedRecipe.comments[0].ingredients.filter(ing => {
-                        const ingLower = ing.toLowerCase();
-                        return !STAPLES.some(staple => ingLower.includes(staple));
-                      }).map((ing, i) => <li key={i}>{ing}</li>)
-                    : <li>No ingredient details available.</li>
-                  }
-                </ul>
-              </div>
-              <div className="mb-4">
-                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Instructions</h4>
-                <ul className="list-decimal list-inside text-theme-secondary opacity-80">
-                  {selectedRecipe.comments.length > 0 && selectedRecipe.comments[0].instructions
-                    ? selectedRecipe.comments[0].instructions.map((step, i) => <li key={i}>{step}</li>)
-                    : <li>No instructions available.</li>
-                  }
-                </ul>
-              </div>
-              <div className="mb-6">
-                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Community Comments</h4>
-                <ul className="space-y-2">
-                  {selectedRecipe.comments.map((c, i) => (
-                    <li key={i} className="bg-theme-secondary p-3 rounded-lg border border-theme">
-                      <span className="font-bold text-[var(--accent-color)]">{c.userName || 'Anonymous'}:</span> <span className="italic">{c.comment}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <button 
-                onClick={() => { setShowModal(false); onAddToPlan && selectedRecipe.comments[0] && onAddToPlan(selectedRecipe.comments[0].recipe); }}
-                className="w-full bg-[var(--accent-color)] text-white font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2"
-              >
-                <Plus className="w-5 h-5" /> Add to Schedule
+          {sortedRecipes.length > 5 && (
+            <div className="flex justify-center mt-4">
+              <button onClick={() => setShowAll(prev => !prev)} className="px-4 py-2 rounded bg-[var(--accent-color)] text-white">
+                {showAll ? 'Show Less' : `Show More (${sortedRecipes.length - 5})`}
               </button>
             </div>
-            <button className="sticky bottom-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-b-2xl flex items-center justify-center hover:bg-red-500 transition-all" onClick={() => setShowModal(false)}>
-              CLOSE &times;
-            </button>
-          </div>
-        </div>
-      )}
+          )}
+      </div>
+
+      {showModal && selectedRecipe && (() => {
+        // Build a StructuredRecipe from comment.recipe if available
+        const first = selectedRecipe.comments && selectedRecipe.comments[0];
+        const recipeFromComment = first && (first as any).recipe;
+        const structured: StructuredRecipe = recipeFromComment && typeof recipeFromComment.title === 'string'
+          ? (recipeFromComment as StructuredRecipe)
+          : ({
+              title: selectedRecipe.title,
+              description: 'Community favorite',
+              ingredients: (first && (first as any).ingredients) || ['View details to see ingredients'],
+              instructions: (first && (first as any).instructions) || ['View details for instructions'],
+              cookTime: '30-45m'
+            });
+        return (
+          <RecipeModal
+            recipe={structured}
+            isOpen={showModal}
+            onClose={() => setShowModal(false)}
+            onAddToPlan={(r) => { onAddToPlan && onAddToPlan(r); }}
+            onSaveRecipe={(r) => { onSaveRecipe && onSaveRecipe(r); }}
+            showSaveButton={true}
+            showMarkAsMade={false}
+            showAddToPlan={true}
+          />
+        );
+      })()}
     </div>
   );
 };
