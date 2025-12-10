@@ -34,6 +34,10 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSa
 
   const sortedRecipes = Object.values(recipeStats).sort((a, b) => (b.totalRating / Math.max(1, b.count)) - (a.totalRating / Math.max(1, a.count)));
   const [showAll, setShowAll] = useState(false);
+  const findRecipeForStat = (stat: { comments: RecipeRating[] }) => {
+    const ratingWithRecipe = stat.comments.find(c => c.recipe && c.recipe.ingredients && c.recipe.instructions);
+    return ratingWithRecipe ? ratingWithRecipe.recipe : null;
+  };
 
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
@@ -46,6 +50,7 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSa
         {(showAll ? sortedRecipes : sortedRecipes.slice(0,5)).map((stat, idx) => {
            const avg = (stat.totalRating / stat.count).toFixed(1);
            const latestComment = stat.comments && stat.comments[0] ? stat.comments[0] : null;
+           const fullRecipe = findRecipeForStat(stat);
            
            return (
              <div 
@@ -87,16 +92,19 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSa
                     <button 
                         onClick={(e) => {
                             e.stopPropagation();
-                            // Reconstruct a basic structured recipe to add to plan
-                            // Note: In a real app we'd fetch the full details
-                            const mockRecipe: StructuredRecipe = {
-                                title: stat.title,
-                                description: "Community favorite",
-                                ingredients: ["View details to see ingredients"],
-                                instructions: ["View details for instructions"],
-                                cookTime: "30-45m"
-                            };
-                            onAddToPlan(mockRecipe);
+                            if (fullRecipe) {
+                                onAddToPlan(fullRecipe);
+                            } else {
+                                // Fallback for older data that might not have the full recipe
+                                const mockRecipe: StructuredRecipe = {
+                                    title: stat.title,
+                                    description: "Community favorite",
+                                    ingredients: ["Full recipe not available in this rating. Please save it first."],
+                                    instructions: ["Full recipe not available in this rating. Please save it first."],
+                                    cookTime: "N/A"
+                                };
+                                onAddToPlan(mockRecipe);
+                            }
                         }}
                         className="w-full py-2 bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-bold text-xs uppercase tracking-wider rounded-lg hover:bg-[var(--accent-color)] hover:text-white transition-all flex items-center justify-center gap-2"
                     >
@@ -123,18 +131,16 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSa
       </div>
 
       {showModal && selectedRecipe && (() => {
-        // Build a StructuredRecipe from comment.recipe if available
-        const first = selectedRecipe.comments && selectedRecipe.comments[0];
-        const recipeFromComment = first && (first as any).recipe;
-        const structured: StructuredRecipe = recipeFromComment && typeof recipeFromComment.title === 'string'
-          ? (recipeFromComment as StructuredRecipe)
-          : ({
+        const recipeFromComment = findRecipeForStat(selectedRecipe);
+        const structured: StructuredRecipe = recipeFromComment
+          ? recipeFromComment
+          : {
               title: selectedRecipe.title,
               description: 'Community favorite',
-              ingredients: (first && (first as any).ingredients) || ['View details to see ingredients'],
-              instructions: (first && (first as any).instructions) || ['View details for instructions'],
-              cookTime: '30-45m'
-            });
+              ingredients: ['Full recipe not available in this rating. Please save it first.'],
+              instructions: ['Full recipe not available in this rating. Please save it first.'],
+              cookTime: 'N/A'
+            };
         return (
           <RecipeModal
             recipe={structured}

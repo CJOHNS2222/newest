@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Star, MessageSquare } from 'lucide-react';
-import { RecipeRating } from '../types';
+import { RecipeRating, StructuredRecipe } from '../types';
 
 interface RecipeRatingUIProps {
   recipeTitle: string;
+  recipe: StructuredRecipe;
   onRate: (rating: RecipeRating) => void;
 }
 
-export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({ recipeTitle, onRate }) => {
+export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({ recipeTitle, recipe, onRate }) => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -20,7 +21,8 @@ export const RecipeRatingUI: React.FC<RecipeRatingUIProps> = ({ recipeTitle, onR
       rating,
       comment,
       userName: 'Current User', // In a real app this would come from auth
-      date: new Date().toLocaleDateString()
+      date: new Date().toLocaleDateString(),
+      recipe: recipe,
     });
     setIsSubmitted(true);
   };
