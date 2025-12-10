@@ -118,28 +118,35 @@ export const searchRecipes = async (params: RecipeSearchParams): Promise<RecipeS
   try {
     const response = await ai.models.generateContent({
       model: modelId,
-      contents: prompt,
+      contents: {
+        parts: [
+          { text: prompt }
+        ]
+      },
       config: {
-        tools: [{ googleSearch: {} }],
-        // responseMimeType: "application/json", // REMOVED due to incompatibility with tools
-        // responseSchema: schema // REMOVED due to incompatibility with tools
+        tools: [{ googleSearch: {} }]
       },
     });
+
+    console.debug('Gemini raw response:', response);
 
     const jsonText = response.text;
     let recipes: StructuredRecipe[] = [];
     
     if (jsonText) {
-        // Clean up markdown if present
-        const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "").trim();
-        try {
-            const parsed = JSON.parse(cleanJson);
-            recipes = parsed.recipes || [];
-        } catch (e) {
-            console.error("JSON Parse Error:", e);
-            console.log("Raw Text:", jsonText);
-            // Attempt to recover or return empty
-        }
+      // Clean up markdown if present
+      const cleanJson = jsonText.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "").trim();
+      try {
+        const parsed = JSON.parse(cleanJson);
+        recipes = parsed.recipes || [];
+      } catch (e) {
+        console.error("JSON Parse Error:", e);
+        console.log("Raw Text:", jsonText);
+        console.log('Cleaned JSON candidate:', cleanJson);
+        // Attempt to recover or return empty
+      }
+    } else {
+      console.warn('Gemini returned no text for recipe search.');
     }
 
     return {

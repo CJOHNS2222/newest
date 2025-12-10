@@ -181,7 +181,7 @@ export const PantryScanner: React.FC<PantryScannerProps> = ({ inventory, setInve
            </div>
            <div className="flex gap-2">
             <button 
-              onClick={() => { removeItem(idx); addToShoppingList([item.item]); }}
+              onClick={() => { addToShoppingList([item.item]); }}
               className="text-[var(--accent-color)] text-[10px] font-bold uppercase border border-[var(--accent-color)]/30 px-2 py-1 rounded hover:bg-[var(--accent-color)] hover:text-white transition-colors"
             >
               Buy More

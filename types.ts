@@ -90,12 +90,11 @@ export interface Member {
   email: string;
   role: 'Admin' | 'Member';
   status: 'Active' | 'Invited';
-  invitedAt?: string;
-  invitedBy?: string;
 }
 
 export interface Household {
   id: string;
   name: string;
   members: Member[];
+  memberIds?: string[]; // convenience array of member UIDs for fast rule checks
 }

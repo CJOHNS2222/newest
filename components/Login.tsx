@@ -1,22 +1,9 @@
-  const handleForgotPassword = async () => {
-    setError(null);
-    setSuccess(null);
-    if (!validateEmail(email)) {
-      setError('Please enter your email address above to reset password.');
-      return;
-    }
-    try {
-      const auth = getAuth();
-      await auth.sendPasswordResetEmail(email);
-      setSuccess('Password reset email sent! Please check your inbox.');
-    } catch (error) {
-      setError('Failed to send reset email: ' + (error as Error).message);
-    }
-  };
 import React, { useState, useEffect } from 'react';
 import { ChefHat, Mail, Chrome } from 'lucide-react';
 import { User } from '../types';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, sendEmailVerification } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
+import { logEvent } from 'firebase/analytics';
+import { analytics } from '../firebaseConfig';
 
 
 
@@ -71,6 +58,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         await sendEmailVerification(user);
+        logEvent(analytics, 'sign_up', { email: user.email, provider: 'email' });
         setSuccess('Signup successful! Please check your email to verify your account.');
         onLogin({
           id: user.uid,
@@ -82,6 +70,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         return;
       } else {
         userCredential = await signInWithEmailAndPassword(auth, email, password);
+        logEvent(analytics, 'login', { email: userCredential.user.email, provider: 'email' });
         setSuccess('Login successful!');
         const user = userCredential.user;
         onLogin({
@@ -97,6 +86,22 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
   };
 
+  const handleForgotPassword = async () => {
+    setError(null);
+    setSuccess(null);
+    if (!validateEmail(email)) {
+      setError('Please enter your email address above to reset password.');
+      return;
+    }
+    try {
+      const auth = getAuth();
+      await sendPasswordResetEmail(auth, email);
+      setSuccess('Password reset email sent! Please check your inbox.');
+    } catch (error) {
+      setError('Failed to send reset email: ' + (error as Error).message);
+    }
+  };
+
   const handleGoogleLogin = async () => {
     try {
       const auth = getAuth();
@@ -108,6 +113,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         // Use popup for web
         const result = await signInWithPopup(auth, googleProvider);
         const user = result.user;
+        logEvent(analytics, 'login', { email: user.email, provider: 'google' });
         onLogin({
           id: user.uid,
           name: user.displayName || user.email?.split('@')[0] || '',
@@ -117,11 +123,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         });
       }
     } catch (error) {
-      const errorMessage = (error as any).code || (error as Error).message;
-      console.error('Google login error:', errorMessage);
-      if (errorMessage !== 'auth/popup-closed-by-user') {
-        alert('Google login failed: ' + errorMessage);
-      }
+      alert('Google login failed: ' + (error as Error).message);
     }
   };
 
@@ -142,11 +144,13 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           });
         }
       } catch (error) {
-        console.error('Google redirect result error:', error);
+        // Ignore if no redirect result
       }
     };
     checkRedirect();
-  }, [onLogin]);
+    // Only run on mount
+    // eslint-disable-next-line
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#2A0A10] text-white relative overflow-hidden">

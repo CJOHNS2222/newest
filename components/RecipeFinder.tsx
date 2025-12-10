@@ -4,12 +4,15 @@ import { searchRecipes } from '../services/geminiService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe } from '../types';
 import { fetchRecipeImage } from '../services/imageService';
 import { RecipeRatingUI } from './RecipeRating';
+import RecipeModal from './RecipeModal';
+import { logEvent } from 'firebase/analytics';
+import { analytics } from '../firebaseConfig';
 
 interface RecipeFinderProps {
     onAddToPlan: (recipe: StructuredRecipe) => void;
     onSaveRecipe: (recipe: StructuredRecipe) => void;
+    onMarkAsMade?: (recipe: StructuredRecipe) => void;
     inventory: PantryItem[];
-    setInventory: React.Dispatch<React.SetStateAction<PantryItem[]>>;
     ratings: RecipeRating[];
     onRate: (rating: RecipeRating) => void;
     savedRecipes: SavedRecipe[];
@@ -17,57 +20,25 @@ interface RecipeFinderProps {
     setPersistedResult?: (result: RecipeSearchResult | null) => void;
 }
 
-export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, inventory, setInventory, ratings, onRate, savedRecipes, persistedResult, setPersistedResult }) => {
+export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onMarkAsMade, inventory, ratings, onRate, savedRecipes, persistedResult, setPersistedResult }) => {
+        // List of staple items to ignore
+        const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     const [activeView, setActiveView] = useState<'search' | 'saved'>('search');
   
     const [specificQuery, setSpecificQuery] = useState('');
-    const [restrictions, setRestrictions] = useState('');
     const [maxCookTime, setMaxCookTime] = useState<string>('60');
     const [maxIngredients, setMaxIngredients] = useState<string>('10');
     const [recipeType, setRecipeType] = useState<'Snack' | 'Dinner' | 'Dessert' | ''>('');
     const [measurement, setMeasurement] = useState<'Metric' | 'Standard'>('Standard');
     const [strictMode, setStrictMode] = useState(false);
   
-    // Basic pantry staples that don't need to be inventoried
-    const basicIngredients = ['water', 'salt', 'pepper', 'oil', 'butter', 'olive oil', 'vegetable oil', 'cooking oil', 'garlic powder', 'onion powder', 'flour', 'sugar', 'vinegar', 'soy sauce', 'honey', 'lemon juice', 'lime juice'];
-    
-    const isBasicIngredient = (ingredient: string): boolean => {
-      const ingredientLower = ingredient.toLowerCase().trim();
-      return basicIngredients.some(basic => ingredientLower.includes(basic) || basic.includes(ingredientLower.split(/\d+/)[0].trim()));
-    };
-    
     // Use persistedResult if available
-  
-    const handleRecipeMade = (recipe: StructuredRecipe) => {
-      // Parse ingredients and remove matching items from inventory (excluding basic staples)
-      const updatedInventory = [...inventory];
-      
-      recipe.ingredients.forEach(ingredient => {
-        // Skip basic ingredients
-        if (isBasicIngredient(ingredient)) {
-          return;
-        }
-        
-        const ingredientLower = ingredient.toLowerCase();
-        // Find matching inventory item
-        const matchingIndex = updatedInventory.findIndex(item => 
-          ingredientLower.includes(item.item.toLowerCase()) || 
-          item.item.toLowerCase().includes(ingredientLower.split(/\d+/)[0].trim())
-        );
-        
-        if (matchingIndex !== -1) {
-          updatedInventory.splice(matchingIndex, 1);
-        }
-      });
-      
-      setInventory(updatedInventory);
-      setShowRecipeModal(false);
-      alert(`✓ Ingredients removed from inventory!`);
-    };
     const [result, setResult] = useState<RecipeSearchResult | null>(persistedResult || null);
     const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
+    const [searchError, setSearchError] = useState<string | null>(null);
     const [showRecipeModal, setShowRecipeModal] = useState(false);
     const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
+    const [modalIsSavedView, setModalIsSavedView] = useState(false);
 
   const inventoryString = inventory.map(i => i.item).join(', ');
 
@@ -92,29 +63,46 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
     const performSearch = async (params: any) => {
         setLoadingState(LoadingState.LOADING);
         setResult(null);
+        setSearchError(null);
         if (setPersistedResult) setPersistedResult(null);
         try {
+            console.debug('Recipe search params:', params);
             const data = await searchRecipes({
                 ...params,
-                restrictions,
                 maxCookTime: parseInt(maxCookTime),
                 maxIngredients: parseInt(maxIngredients),
                 measurementSystem: measurement,
                 type: recipeType
             });
-            setResult(data);
-            if (setPersistedResult) setPersistedResult(data);
+            // Filter results by type (quick meal, dinner, dessert)
+            let filteredRecipes = data.recipes;
+            if (recipeType) {
+                filteredRecipes = filteredRecipes.filter((r: StructuredRecipe) => {
+                    if (!r.type) return true;
+                    return r.type.toLowerCase() === recipeType.toLowerCase();
+                });
+            }
+            setResult({ ...data, recipes: filteredRecipes });
+            if (setPersistedResult) setPersistedResult({ ...data, recipes: filteredRecipes });
             setLoadingState(LoadingState.SUCCESS);
-        } catch (error) {
+            // Log search event
+            logEvent(analytics, 'search', {
+                query: params.query || 'generate_from_pantry',
+                resultCount: filteredRecipes?.length || 0,
+                recipeType: recipeType || 'any'
+            });
+        } catch (error: any) {
+            console.error('performSearch error:', error);
+            setSearchError(error?.message ? String(error.message) : JSON.stringify(error));
             setLoadingState(LoadingState.ERROR);
         }
     };
 
   const getRatingInfo = (title: string) => {
-      const related = ratings.filter(r => r.recipeTitle.toLowerCase() === title.toLowerCase());
+      const related = ratings.filter(r => !!r?.recipeTitle && r.recipeTitle.toLowerCase() === title.toLowerCase());
       if (related.length === 0) return null;
       
-      const total = related.reduce((a, b) => a + b.rating, 0);
+      const total = related.reduce((a, b) => a + (b?.rating || 0), 0);
       return {
           avg: (total / related.length).toFixed(1),
           count: related.length,
@@ -135,13 +123,48 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             }
         }, [result]);
 
+        const openRecipeModal = (recipe: any, isSavedView = false) => {
+            // Normalize recipe shape so modal can safely render instructions/ingredients
+            const normalized: any = { ...recipe };
+            normalized.title = normalized.title || 'Untitled Recipe';
+            if (!Array.isArray(normalized.instructions)) {
+                if (typeof normalized.instructions === 'string') {
+                    // Split on newlines or numbered steps
+                    normalized.instructions = normalized.instructions.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
+                } else if (normalized.instructions && typeof normalized.instructions === 'object') {
+                    // If stored as object with numeric keys, convert to array
+                    normalized.instructions = Object.values(normalized.instructions).map(String).filter(Boolean);
+                } else {
+                    normalized.instructions = [];
+                }
+            }
+            if (!Array.isArray(normalized.ingredients)) {
+                if (typeof normalized.ingredients === 'string') {
+                    normalized.ingredients = normalized.ingredients.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
+                } else if (normalized.ingredients && typeof normalized.ingredients === 'object') {
+                    normalized.ingredients = Object.values(normalized.ingredients).map(String).filter(Boolean);
+                } else {
+                    normalized.ingredients = [];
+                }
+            }
+            setModalRecipe(normalized as StructuredRecipe);
+            setModalIsSavedView(Boolean(isSavedView));
+            setShowRecipeModal(true);
+        };
+
         const renderRecipeCard = (recipe: StructuredRecipe, isSavedView = false) => {
             const ratingInfo = getRatingInfo(recipe.title);
             const isSaved = savedRecipes.some(r => r.title === recipe.title);
-            const imgUrl = imageUrls[recipe.title] || `https://source.unsplash.com/600x400/?${encodeURIComponent(recipe.title.split(' ').slice(0,2).join(','))},food`;
+            const titleKey = recipe.title || 'Untitled Recipe';
+            const imgUrl = imageUrls[titleKey] || `https://source.unsplash.com/600x400/?${encodeURIComponent((titleKey as string).split(' ').slice(0,2).join(','))},food`;
+            // Filter out staple items from ingredient list
+            const filteredIngredients = recipe.ingredients.filter(ing => {
+                const ingLower = ing.toLowerCase();
+                return !STAPLES.some(staple => ingLower.includes(staple));
+            });
 
             return (
-                <div key={recipe.title} className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden group hover:shadow-2xl transition-all mb-6 cursor-pointer" onClick={() => { setModalRecipe(recipe); setShowRecipeModal(true); }}>
+                <div key={titleKey} className="bg-theme-secondary rounded-2xl shadow-xl border border-theme overflow-hidden group hover:shadow-2xl transition-all mb-6 cursor-pointer" onClick={() => openRecipeModal(recipe, isSavedView)}>
                     {/* Recipe Image */}
                     <div className="h-40 relative bg-gray-200 overflow-hidden">
                         <div 
@@ -159,62 +182,43 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                                     <Clock className="w-3 h-3 text-[var(--accent-color)]" /> {recipe.cookTime}
                                 </span>
                                 {ratingInfo && (
-                                    <span className="bg-[var(--accent-color)]/90 px-2 py-1 rounded flex items-center gap-1">
-                                        <Star className="w-3 h-3 fill-white" /> {ratingInfo.avg}
+                                    <span className="bg-black/40 backdrop-blur px-2 py-1 rounded flex items-center gap-1">
+                                        <Star className="w-3 h-3 text-yellow-400" /> {ratingInfo.avg} ({ratingInfo.count})
                                     </span>
                                 )}
                             </div>
                         </div>
-                        {!isSavedView && (
-                            <button 
-                                onClick={() => onSaveRecipe(recipe)}
-                                className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all ${isSaved ? 'bg-[var(--accent-color)] text-white' : 'bg-black/30 text-white hover:bg-[var(--accent-color)]'}`}
-                            >
-                                <Heart className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
-                            </button>
-                        )}
                     </div>
 
-            <div className="p-6">
-                {ratingInfo && (
-                    <div className="mb-4 p-3 bg-theme-primary rounded-lg border border-theme flex items-start gap-2">
-                        <div className="min-w-[4px] h-full bg-[var(--accent-color)] rounded-full"></div>
-                        <div>
-                             <div className="text-xs font-bold text-[var(--accent-color)] uppercase mb-0.5">Community Verdict</div>
-                             <p className="text-xs italic text-theme-secondary opacity-80">"{ratingInfo.snippet}"</p>
+                    <div className="p-6">
+                        <p className="text-theme-secondary opacity-70 text-sm mb-4 leading-relaxed">{recipe.description}</p>
+                        <div className="grid gap-4 mb-6">
+                            <div className="bg-theme-primary/50 p-4 rounded-lg">
+                                <h5 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2 flex items-center gap-2">
+                                    <List className="w-3 h-3" /> Ingredients
+                                </h5>
+                                <ul className="text-sm text-theme-secondary opacity-80 space-y-1 list-disc list-inside">
+                                    {filteredIngredients.map((ing, i) => <li key={i}>{ing}</li>)}
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onAddToPlan(recipe); }}
+                                className="flex-1 bg-theme-primary border border-theme hover:border-[var(--accent-color)] text-[var(--accent-color)] font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 hover:bg-[var(--accent-color)] hover:text-white"
+                            >
+                                <Plus className="w-5 h-5" /> Add to Schedule
+                            </button>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-theme" onClick={(e) => e.stopPropagation()}>
+                            <RecipeRatingUI recipeTitle={recipe.title} onRate={onRate} />
                         </div>
                     </div>
-                )}
-
-                <p className="text-theme-secondary opacity-70 text-sm mb-4 leading-relaxed">{recipe.description}</p>
-                
-                <div className="grid gap-4 mb-6">
-                    <div className="bg-theme-primary/50 p-4 rounded-lg">
-                        <h5 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2 flex items-center gap-2">
-                            <List className="w-3 h-3" /> Ingredients
-                        </h5>
-                        <ul className="text-sm text-theme-secondary opacity-80 space-y-1 list-disc list-inside">
-                            {recipe.ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
-                        </ul>
-                    </div>
                 </div>
-
-                <div className="flex gap-2">
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); onAddToPlan(recipe); }}
-                        className="flex-1 bg-theme-primary border border-theme hover:border-[var(--accent-color)] text-[var(--accent-color)] font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 hover:bg-[var(--accent-color)] hover:text-white"
-                    >
-                        <Plus className="w-5 h-5" /> Add to Schedule
-                    </button>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-theme" onClick={e => e.stopPropagation()}>
-                        <RecipeRatingUI recipeTitle={recipe.title} onRate={onRate} />
-                </div>
-            </div>
-        </div>
-     );
-  };
+            );
+        };
 
   return (
     <div className="space-y-6 pb-24 max-w-2xl mx-auto animate-fade-in">
@@ -322,42 +326,44 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     </div>
 
                     {/* Recipe Type Selector & Inputs Row */}
-                    <div className="grid grid-cols-3 gap-3">
-                        <div>
-                            <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Type</label>
-                            <select
-                              value={recipeType}
-                              onChange={e => setRecipeType(e.target.value as 'Snack' | 'Dinner' | 'Dessert' | '')}
-                              className="w-full p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
-                            >
-                              <option value="">Any</option>
-                              <option value="Snack">Quick Snack</option>
-                              <option value="Dinner">Dinner</option>
-                              <option value="Dessert">Dessert</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Time</label>
-                            <div className="relative">
-                                <input
-                                type="number"
-                                value={maxCookTime}
-                                onChange={(e) => setMaxCookTime(e.target.value)}
-                                className="w-16 p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
-                                />
-                                <span className="absolute right-2 top-2.5 opacity-50 text-[10px] font-bold mt-1">MIN</span>
-                            </div>
-                        </div>
-                        <div>
-                            <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Items</label>
-                            <input
-                                type="number"
-                                value={maxIngredients}
-                                onChange={(e) => setMaxIngredients(e.target.value)}
-                                className="w-16 p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
-                            />
-                        </div>
-                    </div>
+                                        <div className="grid grid-cols-4 gap-3">
+                                                <div>
+                                                        <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Type</label>
+                                                        <select
+                                                            value={recipeType}
+                                                            onChange={e => setRecipeType(e.target.value as 'Snack' | 'Dinner' | 'Dessert' | '')}
+                                                            className="w-full p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                                                        >
+                                                            <option value="">Any</option>
+                                                            <option value="Snack">Quick Snack</option>
+                                                            <option value="Dinner">Dinner</option>
+                                                            <option value="Dessert">Dessert</option>
+                                                        </select>
+                                                </div>
+                                                {/* Dietary restrictions removed */}
+                                                <div></div>
+                                                <div>
+                                                        <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Time</label>
+                                                        <div className="relative">
+                                                                <input
+                                                                type="number"
+                                                                value={maxCookTime}
+                                                                onChange={(e) => setMaxCookTime(e.target.value)}
+                                                                className="w-16 p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                                                                />
+                                                                <span className="absolute right-2 top-2.5 opacity-50 text-[10px] font-bold mt-1">MIN</span>
+                                                        </div>
+                                                </div>
+                                                <div>
+                                                        <label className="text-[10px] text-[var(--accent-color)] font-bold uppercase mb-1 block">Max Items</label>
+                                                        <input
+                                                                type="number"
+                                                                value={maxIngredients}
+                                                                onChange={(e) => setMaxIngredients(e.target.value)}
+                                                                className="w-16 p-2.5 rounded-lg border border-theme bg-theme-primary text-theme-primary focus:border-[var(--accent-color)] outline-none text-sm"
+                                                        />
+                                                </div>
+                                        </div>
 
                     <button
                         type="submit"
@@ -372,7 +378,10 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
             {loadingState === LoadingState.ERROR && (
                 <div className="p-4 bg-red-900/20 border border-red-500 text-red-400 rounded-xl text-center font-medium">
-                Search failed. Please try again.
+                <div>Search failed. Please try again.</div>
+                {searchError && (
+                    <div className="text-xs mt-2 text-red-300">Error: {searchError}</div>
+                )}
                 </div>
             )}
 
@@ -384,40 +393,17 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
 
             {/* Modal for full recipe details */}
             {showRecipeModal && modalRecipe && (
-                <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowRecipeModal(false)}>
-                    <div className="bg-theme-primary rounded-2xl shadow-2xl p-0 max-w-lg w-full relative flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                        <button className="sticky top-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-t-2xl flex items-center justify-center hover:bg-red-500 transition-all" onClick={() => setShowRecipeModal(false)}>
-                            CLOSE &times;
-                        </button>
-                        <div className="overflow-y-auto flex-1 p-8">
-                            <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{modalRecipe.title}</h2>
-                            <p className="mb-4 text-theme-secondary opacity-70">{modalRecipe.description}</p>
-                            <div className="mb-4">
-                                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Ingredients</h4>
-                                <ul className="list-disc list-inside text-theme-secondary opacity-80">
-                                    {modalRecipe.ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
-                                </ul>
-                            </div>
-                            <div className="mb-6">
-                                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Instructions</h4>
-                                <ol className="list-decimal list-inside text-theme-secondary opacity-80 space-y-1">
-                                    {modalRecipe.instructions.map((step, i) => <li key={i}>{step}</li>)}
-                                </ol>
-                            </div>
-                            <div className="border-t border-theme pt-4">
-                                <RecipeRatingUI recipeTitle={modalRecipe.title} onRate={onRate} />
-                            </div>
-                        </div>
-                        <div className="sticky bottom-0 z-10 w-full flex gap-2 p-4 bg-theme-secondary rounded-b-2xl">
-                          <button className="flex-1 py-3 text-lg font-bold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all" onClick={() => handleRecipeMade(modalRecipe)}>
-                            ✓ Made
-                          </button>
-                          <button className="flex-1 py-3 text-lg font-bold text-white bg-[var(--accent-color)] rounded-lg hover:bg-red-500 transition-all" onClick={() => setShowRecipeModal(false)}>
-                            Close
-                          </button>
-                        </div>
-                    </div>
-                </div>
+                <RecipeModal
+                    recipe={modalRecipe}
+                    isOpen={showRecipeModal}
+                    onClose={() => setShowRecipeModal(false)}
+                    onAddToPlan={(r) => { onAddToPlan(r); }}
+                    onSaveRecipe={(r) => { onSaveRecipe(r); }}
+                    onMarkAsMade={(r) => { if (onMarkAsMade) onMarkAsMade(r); }}
+                    showSaveButton={!modalIsSavedView}
+                    showMarkAsMade={true}
+                    showAddToPlan={true}
+                />
             )}
         </>
       )}

@@ -1,27 +1,24 @@
-# Logs
-logs
+# Dependencies
+/node_modules
+
+# Build output
+/dist
+/build
+/.next
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Log files
 *.log
+firebase-debug.log
+
+# IDE & OS files
+.vscode
+.idea
+.DS_Store
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Ignore environment variables
-.env.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?

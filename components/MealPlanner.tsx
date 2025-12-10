@@ -1,72 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2 } from 'lucide-react';
-import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, RecipeRating } from '../types';
-import { RecipeRatingUI } from './RecipeRating';
+import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe } from '../types';
+import RecipeModal from './RecipeModal';
 
 interface MealPlannerProps {
   mealPlan: DayPlan[];
   setMealPlan: React.Dispatch<React.SetStateAction<DayPlan[]>>;
   inventory: PantryItem[];
-  setInventory: React.Dispatch<React.SetStateAction<PantryItem[]>>;
   addToShoppingList: (items: string[]) => void;
-  ratings?: RecipeRating[];
-  onRate?: (rating: RecipeRating) => void;
+  onAddToPlan?: (recipe: StructuredRecipe) => void;
+  onSaveRecipe?: (recipe: StructuredRecipe) => void;
+  onMarkAsMade?: (recipe: StructuredRecipe) => void;
 }
 
-export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, setInventory, addToShoppingList, ratings = [], onRate = () => {} }) => {
+export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade }) => {
+    // List of staple items to ignore
+    const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
   const [draggedMeal, setDraggedMeal] = useState<{ dayIndex: number, mealIndex: number } | null>(null);
   const [missingItemsCount, setMissingItemsCount] = useState(0);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [modalRecipe, setModalRecipe] = useState<StructuredRecipe | null>(null);
 
-  // Basic pantry staples that don't need to be inventoried
-  const basicIngredients = ['water', 'salt', 'pepper', 'oil', 'butter', 'olive oil', 'vegetable oil', 'cooking oil', 'garlic powder', 'onion powder', 'flour', 'sugar', 'vinegar', 'soy sauce', 'honey', 'lemon juice', 'lime juice'];
-  
-  const isBasicIngredient = (ingredient: string): boolean => {
-    const ingredientLower = ingredient.toLowerCase().trim();
-    return basicIngredients.some(basic => ingredientLower.includes(basic) || basic.includes(ingredientLower.split(/\d+/)[0].trim()));
-  };
-
-  const handleRecipeMade = (recipe: StructuredRecipe) => {
-    // Parse ingredients and remove matching items from inventory (excluding basic staples)
-    const updatedInventory = [...inventory];
-    
-    recipe.ingredients.forEach(ingredient => {
-      // Skip basic ingredients
-      if (isBasicIngredient(ingredient)) {
-        return;
-      }
-      
-      const ingredientLower = ingredient.toLowerCase();
-      // Find matching inventory item
-      const matchingIndex = updatedInventory.findIndex(item => 
-        ingredientLower.includes(item.item.toLowerCase()) || 
-        item.item.toLowerCase().includes(ingredientLower.split(/\d+/)[0].trim())
-      );
-      
-      if (matchingIndex !== -1) {
-        updatedInventory.splice(matchingIndex, 1);
-      }
-    });
-    
-    setInventory(updatedInventory);
-    setShowRecipeModal(false);
-    alert(`✓ Ingredients removed from inventory!`);
-  };
-
   const getMissingIngredients = () => {
     const allNeededIngredients = mealPlan.flatMap(day => 
-        day.meals.flatMap(meal => meal.recipe.ingredients)
+      day.meals.flatMap(meal => meal.recipe.ingredients)
     );
-    
+    // Filter out staple items
     const missing = allNeededIngredients.filter(needed => {
-        const neededLower = needed.toLowerCase();
-        return !inventory.some(pantryItem => 
-            neededLower.includes(pantryItem.item.toLowerCase()) || 
-            pantryItem.item.toLowerCase().includes(neededLower)
-        );
+      const neededLower = needed.toLowerCase();
+      if (STAPLES.some(staple => neededLower.includes(staple))) return false;
+      return !inventory.some(pantryItem => 
+        neededLower.includes(pantryItem.item.toLowerCase()) || 
+        pantryItem.item.toLowerCase().includes(neededLower)
+      );
     });
-
     return [...new Set(missing)];
   };
 
@@ -180,40 +147,17 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
       </div>
       {/* Modal for full recipe details */}
       {showRecipeModal && modalRecipe && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setShowRecipeModal(false)}>
-          <div className="bg-theme-primary rounded-2xl shadow-2xl p-0 max-w-lg w-full relative flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-            <button className="sticky top-0 z-10 w-full py-4 text-3xl font-bold text-white bg-[var(--accent-color)] rounded-t-2xl flex items-center justify-center hover:bg-red-500 transition-all" onClick={() => setShowRecipeModal(false)}>
-              CLOSE &times;
-            </button>
-            <div className="overflow-y-auto flex-1 p-8">
-              <h2 className="text-2xl font-serif font-bold mb-2 text-[var(--accent-color)]">{modalRecipe.title}</h2>
-              <p className="mb-4 text-theme-secondary opacity-70">{modalRecipe.description}</p>
-              <div className="mb-4">
-                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Ingredients</h4>
-                <ul className="list-disc list-inside text-theme-secondary opacity-80">
-                  {modalRecipe.ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
-                </ul>
-              </div>
-              <div className="mb-6">
-                <h4 className="text-xs font-bold text-[var(--accent-color)] uppercase mb-2">Instructions</h4>
-                <ol className="list-decimal list-inside text-theme-secondary opacity-80 space-y-1">
-                  {modalRecipe.instructions.map((step, i) => <li key={i}>{step}</li>)}
-                </ol>
-              </div>
-              <div className="border-t border-theme pt-4">
-                <RecipeRatingUI recipeTitle={modalRecipe.title} onRate={onRate} />
-              </div>
-            </div>
-            <div className="sticky bottom-0 z-10 w-full flex gap-2 p-4 bg-theme-secondary rounded-b-2xl">
-              <button className="flex-1 py-3 text-lg font-bold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all" onClick={() => handleRecipeMade(modalRecipe)}>
-                ✓ Made
-              </button>
-              <button className="flex-1 py-3 text-lg font-bold text-white bg-[var(--accent-color)] rounded-lg hover:bg-red-500 transition-all" onClick={() => setShowRecipeModal(false)}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <RecipeModal
+          recipe={modalRecipe}
+          isOpen={showRecipeModal}
+          onClose={() => setShowRecipeModal(false)}
+          onAddToPlan={onAddToPlan}
+          onSaveRecipe={onSaveRecipe}
+          onMarkAsMade={onMarkAsMade}
+          showSaveButton={true}
+          showMarkAsMade={true}
+          showAddToPlan={true}
+        />
       )}
     </div>
   );
