@@ -24,6 +24,7 @@ export interface StructuredRecipe {
   ingredients: string[];
   instructions: string[];
   cookTime: string;
+  type?: string;
 }
 
 export interface SavedRecipe extends StructuredRecipe {

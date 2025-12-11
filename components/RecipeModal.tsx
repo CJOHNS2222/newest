@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, Heart } from 'lucide-react';
-import { StructuredRecipe } from '../types';
+import { StructuredRecipe, RecipeRating } from '../types';
+import { RecipeRatingUI } from './RecipeRating';
 
 interface RecipeModalProps {
   recipe: StructuredRecipe;
@@ -8,6 +9,7 @@ interface RecipeModalProps {
   onClose: () => void;
   onAddToPlan?: (recipe: StructuredRecipe) => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
+  onRate?: (rating: any) => void;
   onMarkAsMade?: (recipe: StructuredRecipe) => void;
   showSaveButton?: boolean;
   showMarkAsMade?: boolean;
@@ -20,6 +22,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   onClose,
   onAddToPlan,
   onSaveRecipe,
+  onRate,
   onMarkAsMade,
   showSaveButton = true,
   showMarkAsMade = false,
@@ -59,6 +62,18 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
               )}
             </ol>
           </div>
+          {onRate && (
+            <div className="mt-6 pt-4 border-t border-theme">
+             <RecipeRatingUI
+             recipeTitle={recipe.title}
+             recipe={recipe}
+             onRate={(rating) => {
+              if (onRate) onRate(rating);
+              onClose(); // This will close the modal after submitting a rating
+            }}
+          />
+        </div>
+      )}
         </div>
         <div className="sticky bottom-0 z-20 w-full py-4 bg-theme-primary rounded-b-2xl flex items-center gap-2 p-4">
           <button className="flex-1 py-3 font-bold border border-[var(--accent-color)] rounded-lg flex items-center justify-center gap-2" onClick={onClose}>CLOSE</button>

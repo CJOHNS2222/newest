@@ -213,7 +213,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                         </div>
 
                         <div className="mt-4 pt-4 border-t border-theme" onClick={(e) => e.stopPropagation()}>
-                            <RecipeRatingUI recipeTitle={recipe.title} onRate={onRate} />
+                             <RecipeRatingUI recipeTitle={recipe.title} recipe={recipe} onRate={onRate} />
                         </div>
                     </div>
                 </div>
@@ -399,6 +399,7 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                     onClose={() => setShowRecipeModal(false)}
                     onAddToPlan={(r) => { onAddToPlan(r); }}
                     onSaveRecipe={(r) => { onSaveRecipe(r); }}
+                    onRate={onRate}
                     onMarkAsMade={(r) => { if (onMarkAsMade) onMarkAsMade(r); }}
                     showSaveButton={!modalIsSavedView}
                     showMarkAsMade={true}
