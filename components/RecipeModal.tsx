@@ -1,17 +1,19 @@
 import React from 'react';
-import { Plus, Heart } from 'lucide-react';
-import { StructuredRecipe, RecipeRating } from '../types';
+import { Plus, Heart, Trash2 } from 'lucide-react';
+import { StructuredRecipe, RecipeRating, SavedRecipe } from '../types';
 import { RecipeRatingUI } from './RecipeRating';
 
 interface RecipeModalProps {
-  recipe: StructuredRecipe;
+  recipe: StructuredRecipe | SavedRecipe;
   isOpen: boolean;
   onClose: () => void;
   onAddToPlan?: (recipe: StructuredRecipe) => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
+  onDeleteRecipe?: (recipe: SavedRecipe) => void;
   onRate?: (rating: any) => void;
   onMarkAsMade?: (recipe: StructuredRecipe) => void;
   showSaveButton?: boolean;
+  showDeleteButton?: boolean;
   showMarkAsMade?: boolean;
   showAddToPlan?: boolean;
 }
@@ -22,9 +24,11 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   onClose,
   onAddToPlan,
   onSaveRecipe,
+  onDeleteRecipe,
   onRate,
   onMarkAsMade,
   showSaveButton = true,
+  showDeleteButton = false,
   showMarkAsMade = false,
   showAddToPlan = true
 }) => {
@@ -77,18 +81,23 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         </div>
         <div className="sticky bottom-0 z-20 w-full py-4 bg-theme-primary rounded-b-2xl flex items-center gap-2 p-4">
           <button className="flex-1 py-3 font-bold border border-[var(--accent-color)] rounded-lg flex items-center justify-center gap-2" onClick={onClose}>CLOSE</button>
+          {showDeleteButton && onDeleteRecipe && (
+            <button onClick={() => { onDeleteRecipe(recipe as SavedRecipe); onClose(); }} className="flex-1 py-3 font-bold bg-red-500 text-white rounded-lg flex items-center justify-center gap-2">
+              <Trash2 className="w-4 h-4" /> Delete
+            </button>
+          )}
           {showAddToPlan && onAddToPlan && (
-            <button onClick={() => { onAddToPlan(recipe); onClose(); }} className="flex-1 py-3 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2">
+            <button onClick={() => { onAddToPlan(recipe as StructuredRecipe); onClose(); }} className="flex-1 py-3 font-bold bg-[var(--accent-color)] text-white rounded-lg flex items-center justify-center gap-2">
               <Plus className="w-4 h-4" /> Add to Schedule
             </button>
           )}
           {showSaveButton && onSaveRecipe && (
-            <button onClick={() => { onSaveRecipe(recipe); onClose(); }} className="flex-1 py-3 font-bold border border-[var(--accent-color)] rounded-lg flex items-center justify-center gap-2">
+            <button onClick={() => { onSaveRecipe(recipe as StructuredRecipe); onClose(); }} className="flex-1 py-3 font-bold border border-[var(--accent-color)] rounded-lg flex items-center justify-center gap-2">
               <Heart className="w-4 h-4" /> Save
             </button>
           )}
           {showMarkAsMade && onMarkAsMade && (
-            <button onClick={() => { onMarkAsMade(recipe); onClose(); }} className="flex-1 py-3 font-bold bg-[var(--accent-color)] text-white rounded-lg">Mark as Made</button>
+            <button onClick={() => { onMarkAsMade(recipe as StructuredRecipe); onClose(); }} className="flex-1 py-3 font-bold bg-[var(--accent-color)] text-white rounded-lg">Mark as Made</button>
           )}
         </div>
       </div>
