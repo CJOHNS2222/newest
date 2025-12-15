@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { User } from '../types';
 import { logEvent } from 'firebase/analytics';
-import { analytics } from '../firebaseConfig';
+import { analytics, db } from '../firebaseConfig';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(() => {
@@ -12,11 +13,31 @@ export function useAuth() {
 
   useEffect(() => {
     const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (!fbUser) {
         setUser(null);
         return;
       }
+
+      // Create user document if it doesn't exist
+      const userDocRef = doc(db, 'users', fbUser.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (!userDocSnap.exists()) {
+        // Create user document with default subscription
+        await setDoc(userDocRef, {
+          subscription: {
+            tier: 'premium',
+            status: 'active',
+            current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+            cancel_at_period_end: false
+          },
+          createdAt: new Date(),
+          email: fbUser.email,
+          name: fbUser.displayName
+        });
+      }
+
       setUser(prev => ({
         id: fbUser.uid,
         name: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'User'),
@@ -36,7 +57,9 @@ export function useAuth() {
 
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser);
-    logEvent(analytics, 'login', { method: loggedInUser.provider });
+    if (analytics) {
+      logEvent(analytics, 'login', { method: loggedInUser.provider });
+    }
   };
 
   const handleLogout = () => {

@@ -3,6 +3,10 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Users may read/write only their own user-scoped data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
@@ -35,16 +39,10 @@ service cloud.firestore {
       allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
-    // Notifications: allow only the recipient (by email) to read/update/delete
-    // and require authenticated creators to create notifications for themselves.
-    // Cloud Functions using the admin SDK bypass these rules so server-side writes remain possible.
-    match /notifications/{docId} {
-      // Create only if the authenticated user is creating a notification for their own email
-      allow create: if request.auth != null && request.resource.data.email == request.auth.token.email;
-      // Reads are allowed only to the document recipient
-      allow read: if request.auth != null && resource.data.email == request.auth.token.email;
-      // Allow the recipient to update/delete their own notification (e.g., mark as read)
-      allow update, delete: if request.auth != null && resource.data.email == request.auth.token.email;
+    // Feedback collection: allow authenticated users to create feedback
+    match /feedback/{docId} {
+      allow create: if request.auth != null;
+      allow read: if false; // Only allow creation, no reading for privacy
     }
 
     // Default deny
