@@ -10,7 +10,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
   const [ratings, setRatings] = useState<RecipeRating[]>([]);
-  const [mealPlan, setMealPlan] = useState<DayPlan[] | null>(null);
+  const [mealPlan, setMealPlan] = useState<DayPlan[]>([]);
   const [household, setHousehold] = useState<Household | null>(() => {
     const saved = localStorage.getItem('household');
     return saved ? JSON.parse(saved) : null;
@@ -37,6 +37,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
     // Listener for user's own inventory
     unsubs.push(onSnapshot(collection(db, 'users', user.id, 'inventory'), snap => {
+      console.log('Inventory listener fired, docs:', snap.docs.length);
       setInventory(snap.docs.map(d => d.data() as PantryItem));
     }, err => console.error("Inventory listener failed:", err)));
 
@@ -46,11 +47,23 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     if (inHousehold) {
       // Household listeners
       unsubs.push(onSnapshot(collection(db, 'households', household.id, 'shoppingList'), snap => {
-        setShoppingList(snap.docs.map(d => ({ id: d.id, ...d.data() } as ShoppingItem)));
+        console.log('Household shopping list listener fired, docs:', snap.docs.length);
+        const data = snap.docs.map(d => {
+          const docData = d.data();
+          return {
+            id: d.id,
+            item: docData.item || '',
+            category: docData.category || 'Manual',
+            checked: docData.checked || false
+          } as ShoppingItem;
+        });
+        (window as any).__remoteShoppingListUpdate = true;
+        setShoppingList(data);
+        setTimeout(() => { (window as any).__remoteShoppingListUpdate = false; }, 100);
       }, err => console.error("Household shoppingList listener failed:", err)));
 
       unsubs.push(onSnapshot(collection(db, 'households', household.id, 'savedRecipes'), snap => {
-        setSavedRecipes(snap.docs.map(d => d.data() as SavedRecipe));
+        setSavedRecipes(snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe)));
       }, err => console.error("Household savedRecipes listener failed:", err)));
 
       unsubs.push(onSnapshot(collection(db, 'households', household.id, 'mealPlan'), snap => {
@@ -90,11 +103,23 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     } else {
       // Individual user listeners
       unsubs.push(onSnapshot(collection(db, 'users', user.id, 'shoppingList'), snap => {
-        setShoppingList(snap.docs.map(d => ({ id: d.id, ...d.data() } as ShoppingItem)));
+        console.log('User shopping list listener fired, docs:', snap.docs.length);
+        const data = snap.docs.map(d => {
+          const docData = d.data();
+          return {
+            id: d.id,
+            item: docData.item || '',
+            category: docData.category || 'Manual',
+            checked: docData.checked || false
+          } as ShoppingItem;
+        });
+        (window as any).__remoteShoppingListUpdate = true;
+        setShoppingList(data);
+        setTimeout(() => { (window as any).__remoteShoppingListUpdate = false; }, 100);
       }, err => console.error("User shoppingList listener failed:", err)));
 
       unsubs.push(onSnapshot(collection(db, 'users', user.id, 'savedRecipes'), snap => {
-        setSavedRecipes(snap.docs.map(d => d.data() as SavedRecipe));
+        setSavedRecipes(snap.docs.map(d => ({ id: d.id, ...d.data() } as SavedRecipe)));
       }, err => console.error("User savedRecipes listener failed:", err)));
 
       unsubs.push(onSnapshot(collection(db, 'users', user.id, 'mealPlan'), snap => {
@@ -165,33 +190,37 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         const blockedUntil = (window as any).__householdWriteBlockedUntil || 0;
         if (household?.id && isHouseholdMember(household, user) && now >= blockedUntil) {
           const householdWrites: Promise<any>[] = [];
+
           inventory.forEach(item => {
             householdWrites.push(
               setDoc(doc(db, 'households', household.id, 'inventory', item.item), item).catch(err => ({ err, path: `households/${household.id}/inventory/${item.item}` }))
             );
           });
-          savedRecipes.forEach(item => {
+          savedRecipes.filter(item => item && item.id).forEach(item => {
             householdWrites.push(
               setDoc(doc(db, 'households', household.id, 'savedRecipes', item.id), item).catch(err => ({ err, path: `households/${household.id}/savedRecipes/${item.id}` }))
             );
           });
           if (mealPlan) {
-            mealPlan.forEach(item => {
-              // Only save days that have meals
-              if (item.meals && item.meals.length > 0) {
-                const docId = item.date; // expected 'YYYY-MM-DD'
-                const payload: any = {
-                  date: Timestamp.fromDate(new Date(item.date)),
-                  meals: item.meals || [],
-                  lastModifiedBy: clientId,
-                  lastModifiedAt: serverTimestamp()
-                };
-                householdWrites.push(
-                  setDoc(doc(db, 'households', household.id, 'mealPlan', docId), payload).catch(err => ({ err, path: `households/${household.id}/mealPlan/${docId}` }))
-                );
+            mealPlan.filter(item => item != null && item.date).forEach(item => {
+              // Save all days to keep database current (even empty days overwrite old data)
+              const docId = item.date; // expected 'YYYY-MM-DD'
+              if (!docId || typeof docId !== 'string') {
+                console.warn('Skipping invalid meal plan item:', item);
+                return;
               }
+              const payload: any = {
+                date: Timestamp.fromDate(new Date(item.date)),
+                meals: Array.isArray(item.meals) ? item.meals : [],
+                lastModifiedBy: clientId,
+                lastModifiedAt: serverTimestamp()
+              };
+              householdWrites.push(
+                setDoc(doc(db, 'households', household.id, 'mealPlan', docId), payload).catch(err => ({ err, path: `households/${household.id}/mealPlan/${docId}` }))
+              );
             });
           }
+
           const householdResults = await Promise.allSettled(householdWrites);
           householdResults.forEach((res, idx) => {
             if (res.status === 'rejected' || (res.status === 'fulfilled' && (res.value as any)?.err)) {
@@ -202,28 +231,32 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         } else {
           // Individual user collections (when not in household)
           const userWrites: Promise<any>[] = [];
-          savedRecipes.forEach(item => {
+          
+          savedRecipes.filter(item => item && item.id).forEach(item => {
             userWrites.push(
               setDoc(doc(db, 'users', user.id, 'savedRecipes', item.id), item).catch(err => ({ err, path: `users/${user.id}/savedRecipes/${item.id}` }))
             );
           });
           if (mealPlan) {
-            mealPlan.forEach(item => {
-              // Only save days that have meals
-              if (item.meals && item.meals.length > 0) {
-                const docId = item.date; // expected 'YYYY-MM-DD'
-                const payload: any = {
-                  date: Timestamp.fromDate(new Date(item.date)),
-                  meals: item.meals || [],
-                  lastModifiedBy: clientId,
-                  lastModifiedAt: serverTimestamp()
-                };
-                userWrites.push(
-                  setDoc(doc(db, 'users', user.id, 'mealPlan', docId), payload).catch(err => ({ err, path: `users/${user.id}/mealPlan/${docId}` }))
-                );
+            mealPlan.filter(item => item != null && item.date).forEach(item => {
+              // Save all days to keep database current (even empty days overwrite old data)
+              const docId = item.date; // expected 'YYYY-MM-DD'
+              if (!docId || typeof docId !== 'string') {
+                console.warn('Skipping invalid meal plan item:', item);
+                return;
               }
+              const payload: any = {
+                date: Timestamp.fromDate(new Date(item.date)),
+                meals: Array.isArray(item.meals) ? item.meals : [],
+                lastModifiedBy: clientId,
+                lastModifiedAt: serverTimestamp()
+              };
+              userWrites.push(
+                setDoc(doc(db, 'users', user.id, 'mealPlan', docId), payload).catch(err => ({ err, path: `users/${user.id}/mealPlan/${docId}` }))
+              );
             });
           }
+
           const userResults = await Promise.allSettled(userWrites);
           userResults.forEach((res, idx) => {
             if (res.status === 'rejected' || (res.status === 'fulfilled' && (res.value as any)?.err)) {
@@ -240,13 +273,97 @@ export function useDataManagement(user: User | null, addToast: (message: string,
 
   // Shopping list sync
   useEffect(() => {
-    // Debounced shopping list sync logic here...
-  }, [shoppingList]);
+    if (!user?.id || !shoppingList || (window as any).__remoteShoppingListUpdate) {
+      return;
+    }
+
+    // Debounce the sync to avoid running on every state change
+    const timeoutId = setTimeout(async () => {
+      try {
+        const collectionPath = household?.id && isHouseholdMember(household, user)
+          ? `households/${household.id}/shoppingList`
+          : `users/${user.id}/shoppingList`;
+
+        // Get existing documents
+        const existingDocs = await getDocs(collection(db, collectionPath));
+        const existingItems = existingDocs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Find items to delete (in DB but not in current state)
+        const toDelete = existingItems.filter(existing =>
+          !shoppingList.some(current => current.id === existing.id)
+        );
+
+        // Find items to add/update (in current state but not in DB, or different)
+        const toSave = shoppingList.filter(current => {
+          const existing = existingItems.find(item => item.id === current.id);
+          return !existing || existing.item !== current.item || existing.category !== current.category || existing.checked !== current.checked;
+        });
+
+        // Delete removed items
+        const deletePromises = toDelete.map(item =>
+          deleteDoc(doc(db, collectionPath, item.id)).catch(err => ({ err, path: `${collectionPath}/${item.id}` }))
+        );
+
+        // Save new/modified items
+        const savePromises = toSave.map(item =>
+          setDoc(doc(db, collectionPath, item.id), {
+            item: item.item,
+            category: item.category,
+            checked: item.checked,
+            lastModifiedAt: serverTimestamp()
+          }).catch(err => ({ err, path: `${collectionPath}/${item.id}` }))
+        );
+
+        const allPromises = [...deletePromises, ...savePromises];
+        if (allPromises.length > 0) {
+          const results = await Promise.allSettled(allPromises);
+          const failures = results.filter((res, idx) => res.status === 'rejected' || (res.status === 'fulfilled' && (res.value as any)?.err));
+        }
+      } catch (error) {
+        console.error('Error syncing shopping list:', error);
+      }
+    }, 1000); // 1 second debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [user?.id, household?.id, shoppingList]);
 
   // Meal plan sync
   useEffect(() => {
-    // Meal plan sync logic here...
-  }, [mealPlan]);
+    // Cleanup old meal plan entries (older than 7 days) on app load
+    if (!user?.id) return;
+
+    const cleanupOldMealPlans = async () => {
+      try {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const cutoffDate = Timestamp.fromDate(sevenDaysAgo);
+
+        const collectionPath = household?.id && isHouseholdMember(household, user)
+          ? `households/${household.id}/mealPlan`
+          : `users/${user.id}/mealPlan`;
+
+        const oldDocsQuery = query(
+          collection(db, collectionPath),
+          where('date', '<', cutoffDate)
+        );
+
+        const oldDocs = await getDocs(oldDocsQuery);
+        const deletePromises = oldDocs.docs.map(doc => deleteDoc(doc.ref));
+
+        if (deletePromises.length > 0) {
+          await Promise.allSettled(deletePromises);
+        }
+      } catch (error) {
+        console.error('Error cleaning up old meal plans:', error);
+      }
+    };
+
+    // Only run cleanup once per session
+    if (!(window as any).__mealPlanCleanupDone) {
+      (window as any).__mealPlanCleanupDone = true;
+      cleanupOldMealPlans();
+    }
+  }, [user?.id, household?.id]);
 
   // Ratings listener
   useEffect(() => {

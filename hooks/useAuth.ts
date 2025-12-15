@@ -23,19 +23,27 @@ export function useAuth() {
       const userDocRef = doc(db, 'users', fbUser.uid);
       const userDocSnap = await getDoc(userDocRef);
 
+      console.log('User document check:', fbUser.uid, 'exists:', userDocSnap.exists());
+
       if (!userDocSnap.exists()) {
-        // Create user document with default subscription
-        await setDoc(userDocRef, {
-          subscription: {
-            tier: 'premium',
-            status: 'active',
-            current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
-            cancel_at_period_end: false
-          },
-          createdAt: new Date(),
-          email: fbUser.email,
-          name: fbUser.displayName
-        });
+        console.log('Creating user document for:', fbUser.uid);
+        try {
+          // Create user document with default subscription
+          await setDoc(userDocRef, {
+            subscription: {
+              tier: 'premium',
+              status: 'active',
+              current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+              cancel_at_period_end: false
+            },
+            createdAt: new Date(),
+            email: fbUser.email,
+            name: fbUser.displayName
+          });
+          console.log('User document created successfully');
+        } catch (error) {
+          console.error('Failed to create user document:', error);
+        }
       }
 
       setUser(prev => ({
