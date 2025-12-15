@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { Search, Loader2, Sparkles, ExternalLink, Globe, Plus, Clock, List, ChefHat, ToggleLeft, ToggleRight, Star, Heart, Bookmark } from 'lucide-react';
 import { searchRecipes } from '../services/geminiService';
 import { RecipeSearchResult, LoadingState, RecipeRating, StructuredRecipe, PantryItem, SavedRecipe } from '../types';
+import { Tab } from '../types/app';
 import { fetchRecipeImage } from '../services/imageService';
 import { RecipeRatingUI } from './RecipeRating';
 import RecipeModal from './RecipeModal';
 import { logEvent } from 'firebase/analytics';
 import { analytics } from '../firebaseConfig';
+import { PremiumFeature } from './PremiumFeature';
 
 interface RecipeFinderProps {
     onAddToPlan: (recipe: StructuredRecipe) => void;
@@ -17,11 +19,13 @@ interface RecipeFinderProps {
     ratings: RecipeRating[];
     onRate: (rating: RecipeRating) => void;
     savedRecipes: SavedRecipe[];
+    user: User;
+    setActiveTab: (tab: Tab) => void;
     persistedResult?: RecipeSearchResult | null;
     setPersistedResult?: (result: RecipeSearchResult | null) => void;
 }
 
-export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings, onRate, savedRecipes, persistedResult, setPersistedResult }) => {
+export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveRecipe, onDeleteRecipe, onMarkAsMade, inventory, ratings, onRate, savedRecipes, user, setActiveTab, persistedResult, setPersistedResult }) => {
         // List of staple items to ignore
         const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
     const [activeView, setActiveView] = useState<'search' | 'saved'>('search');
@@ -620,11 +624,13 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
             if (setPersistedResult) setPersistedResult({ ...data, recipes: filteredRecipes });
             setLoadingState(LoadingState.SUCCESS);
             // Log search event
-            logEvent(analytics, 'search', {
-                query: params.query || 'generate_from_pantry',
-                resultCount: filteredRecipes?.length || 0,
-                recipeType: recipeType || 'any'
-            });
+            if (analytics) {
+              logEvent(analytics, 'search', {
+                  query: params.query || 'generate_from_pantry',
+                  resultCount: filteredRecipes?.length || 0,
+                  recipeType: recipeType || 'any'
+              });
+            }
         } catch (error: any) {
             console.error('performSearch error:', error);
             setSearchError(error?.message ? String(error.message) : JSON.stringify(error));
@@ -792,18 +798,27 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
       </div>
 
       {activeView === 'saved' ? (
-          <div className="space-y-4">
-              {savedRecipes.length === 0 ? (
-                  <div className="text-center py-12 opacity-30">
-                      <Bookmark className="w-12 h-12 mx-auto mb-2" />
-                      <p>No saved recipes yet.</p>
-                  </div>
-              ) : (
-                  <div className="grid grid-cols-3 gap-4">
-                      {savedRecipes.map(r => renderRecipeCard(r, true, true))}
-                  </div>
-              )}
-          </div>
+          <PremiumFeature
+            feature="savedRecipes"
+            user={user}
+            limit={25}
+            currentCount={savedRecipes.length}
+            fallbackMessage="Upgrade to Premium to save more than 25 recipes"
+            onUpgrade={() => setActiveTab(Tab.SETTINGS)}
+          >
+            <div className="space-y-4">
+                {savedRecipes.length === 0 ? (
+                    <div className="text-center py-12 opacity-30">
+                        <Bookmark className="w-12 h-12 mx-auto mb-2" />
+                        <p>No saved recipes yet.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-3 gap-4">
+                        {savedRecipes.map(r => renderRecipeCard(r, true, true))}
+                    </div>
+                )}
+            </div>
+          </PremiumFeature>
       ) : (
         <>
             <div className="bg-theme-secondary p-5 rounded-2xl border border-theme shadow-lg">
@@ -977,24 +992,25 @@ export const RecipeFinder: React.FC<RecipeFinderProps> = ({ onAddToPlan, onSaveR
                 </div>
             </div>
 
-            {/* Modal for full recipe details */}
-            {showRecipeModal && modalRecipe && (
-                <RecipeModal
-                    recipe={modalRecipe}
-                    isOpen={showRecipeModal}
-                    onClose={() => setShowRecipeModal(false)}
-                    onAddToPlan={(r) => { onAddToPlan(r); }}
-                    onSaveRecipe={(r) => { onSaveRecipe(r); }}
-                    onDeleteRecipe={(r) => { onDeleteRecipe(r); }}
-                    onRate={onRate}
-                    onMarkAsMade={(r) => { if (onMarkAsMade) onMarkAsMade(r); }}
-                    showSaveButton={!modalIsSavedView}
-                    showDeleteButton={modalIsSavedView}
-                    showMarkAsMade={true}
-                    showAddToPlan={true}
-                />
-            )}
         </>
+      )}
+
+      {/* Modal for full recipe details */}
+      {showRecipeModal && modalRecipe && (
+        <RecipeModal
+          recipe={modalRecipe}
+          isOpen={showRecipeModal}
+          onClose={() => setShowRecipeModal(false)}
+          onAddToPlan={(r) => { onAddToPlan(r); }}
+          onSaveRecipe={(r) => { onSaveRecipe(r); }}
+          onDeleteRecipe={(r) => { onDeleteRecipe(r); }}
+          onRate={onRate}
+          onMarkAsMade={(r) => { if (onMarkAsMade) onMarkAsMade(r); }}
+          showSaveButton={!modalIsSavedView}
+          showDeleteButton={modalIsSavedView}
+          showMarkAsMade={true}
+          showAddToPlan={true}
+        />
       )}
     </div>
   );

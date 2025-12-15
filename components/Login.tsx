@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChefHat, Mail, Chrome } from 'lucide-react';
 import { User } from '../types';
+import { Browser } from '@capacitor/browser';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
 import { logEvent } from 'firebase/analytics';
 import { analytics } from '../firebaseConfig';
@@ -58,7 +59,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         await sendEmailVerification(user);
-        logEvent(analytics, 'sign_up', { email: user.email, provider: 'email' });
+        if (analytics) {
+          logEvent(analytics, 'sign_up', { email: user.email, provider: 'email' });
+        }
         setSuccess('Signup successful! Please check your email to verify your account.');
         onLogin({
           id: user.uid,
@@ -70,7 +73,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         return;
       } else {
         userCredential = await signInWithEmailAndPassword(auth, email, password);
-        logEvent(analytics, 'login', { email: userCredential.user.email, provider: 'email' });
+        if (analytics) {
+          logEvent(analytics, 'login', { email: userCredential.user.email, provider: 'email' });
+        }
         setSuccess('Login successful!');
         const user = userCredential.user;
         onLogin({
@@ -106,28 +111,52 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     try {
       const auth = getAuth();
       const googleProvider = new GoogleAuthProvider();
-      if ((window as any).Capacitor) {
-        // Use redirect for mobile
+      googleProvider.addScope('email');
+      googleProvider.addScope('profile');
+
+      // For mobile, we need to handle the redirect differently
+      if ((window as any).Capacitor && Browser) {
+        // Set the redirect URL for mobile
+        googleProvider.setCustomParameters({
+          prompt: 'select_account'
+        });
+
+        // Use redirect for mobile with Capacitor Browser
         await signInWithRedirect(auth, googleProvider);
       } else {
-        // Use popup for web
-        const result = await signInWithPopup(auth, googleProvider);
-        const user = result.user;
-        logEvent(analytics, 'login', { email: user.email, provider: 'google' });
-        onLogin({
-          id: user.uid,
-          name: user.displayName || user.email?.split('@')[0] || '',
-          email: user.email || '',
-          provider: 'google',
-          hasSeenTutorial: false
-        });
+        // Desktop: Try popup first, fallback to redirect if popup fails
+        try {
+          const result = await signInWithPopup(auth, googleProvider);
+          const user = result.user;
+          if (analytics) {
+            logEvent(analytics, 'login', { email: user.email, provider: 'google' });
+          }
+          onLogin({
+            id: user.uid,
+            name: user.displayName || user.email?.split('@')[0] || '',
+            email: user.email || '',
+            provider: 'google',
+            hasSeenTutorial: false
+          });
+        } catch (popupError: any) {
+          console.log('Popup failed, trying redirect:', popupError);
+          // If popup is blocked or fails, use redirect as fallback
+          if (popupError.code === 'auth/popup-blocked' ||
+              popupError.code === 'auth/popup-closed-by-user' ||
+              popupError.code === 'auth/cancelled-popup-request') {
+            await signInWithRedirect(auth, googleProvider);
+          } else {
+            throw popupError;
+          }
+        }
       }
-    } catch (error) {
-      alert('Google login failed: ' + (error as Error).message);
+    } catch (error: any) {
+      console.error('Google login error:', error);
+      setError('Google login failed: ' + error.message);
     }
   };
 
-  // Handle Google redirect result (for mobile)
+  // Handle Google redirect result (for mobile and fallback)
   useEffect(() => {
     const checkRedirect = async () => {
       const auth = getAuth();
@@ -135,6 +164,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         const result = await getRedirectResult(auth);
         if (result && result.user) {
           const user = result.user;
+          if (analytics) {
+            logEvent(analytics, 'login', { email: user.email, provider: 'google' });
+          }
           onLogin({
             id: user.uid,
             name: user.displayName || user.email?.split('@')[0] || '',
@@ -143,14 +175,37 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             hasSeenTutorial: false
           });
         }
-      } catch (error) {
-        // Ignore if no redirect result
+      } catch (error: any) {
+        console.log('Redirect result error:', error);
+        // Only show error if it's not a "no redirect result" scenario
+        if (error.code !== 'auth/null-user' && error.code !== 'auth/user-cancelled') {
+          setError('Google login failed: ' + error.message);
+        }
       }
     };
+
+    // Check immediately and also listen for auth state changes
     checkRedirect();
-    // Only run on mount
-    // eslint-disable-next-line
-  }, []);
+
+    // Also listen for auth state changes in case the redirect happens while component is mounted
+    const unsubscribe = getAuth().onAuthStateChanged((user) => {
+      if (user && user.providerData.some(provider => provider.providerId === 'google.com')) {
+        // User is signed in with Google, trigger login callback
+        if (analytics) {
+          logEvent(analytics, 'login', { email: user.email, provider: 'google' });
+        }
+        onLogin({
+          id: user.uid,
+          name: user.displayName || user.email?.split('@')[0] || '',
+          email: user.email || '',
+          provider: 'google',
+          hasSeenTutorial: false
+        });
+      }
+    });
+
+    return unsubscribe;
+  }, [onLogin]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#2A0A10] text-white relative overflow-hidden">
@@ -250,12 +305,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <span className="text-xs text-red-200/40 font-medium">OR CONTINUE WITH</span>
           <div className="h-px bg-red-900/30 flex-1"></div>
         </div>
-
-        <div className="grid grid-cols-1 gap-4">
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            className="flex items-center justify-center gap-2 bg-white text-gray-800 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors"
+//
+//        <div className="grid grid-cols-1 gap-4">
+  //        <button
+  //          type="button"
+ //           onClick={handleGoogleLogin}
+  //          className="flex items-center justify-center gap-2 bg-white text-gray-800 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors"
           >
             <Chrome className="w-5 h-5 text-red-500" />
             Google

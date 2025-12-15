@@ -72,10 +72,14 @@ const App: React.FC = () => {
     });
     if (!loggedInUser.hasSeenTutorial) setShowTutorial(true);
 
-    logEvent(analytics, 'login', { method: loggedInUser.provider });
+    if (analytics) {
+      logEvent(analytics, 'login', { method: loggedInUser.provider });
+    }
     
     if (isNewMember && household?.id) {
-      logEvent(analytics, 'join_group', { groupId: household.id, groupName: household.name });
+      if (analytics) {
+        logEvent(analytics, 'join_group', { groupId: household.id, groupName: household.name });
+      }
     }
 
     if (loggedInUser?.email) {
@@ -107,12 +111,14 @@ const App: React.FC = () => {
               user={user} 
               household={household} 
               setHousehold={setHousehold} 
-              onClose={() => setShowHousehold(false)} 
+              onClose={() => setShowHousehold(false)}
+              setActiveTab={setActiveTab}
           />
         )}
         <AppHeader user={user} settings={settings} setSettings={setSettings} onShowHousehold={() => setShowHousehold(true)} />
         <MainContent 
           activeTab={activeTab}
+          setActiveTab={setActiveTab}
           user={user}
           inventory={inventory}
           setInventory={setInventory}
