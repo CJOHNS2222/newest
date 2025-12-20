@@ -18,6 +18,10 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSa
   // Group ratings by recipe title and calculate average
   const recipeStats = ratings.reduce((acc, curr) => {
     const key = curr.recipeTitle || 'Untitled';
+    // Skip ratings with no meaningful title or recipe data
+    if (!key || key === 'Untitled' || !curr.recipeTitle) {
+      return acc;
+    }
     if (!acc[key]) {
       acc[key] = {
         title: key,
@@ -32,7 +36,9 @@ export const Community: React.FC<CommunityProps> = ({ ratings, onAddToPlan, onSa
     return acc;
   }, {} as Record<string, { title: string, totalRating: number, count: number, comments: RecipeRating[] }>);
 
-  const sortedRecipes = Object.values(recipeStats).sort((a, b) => (b.totalRating / Math.max(1, b.count)) - (a.totalRating / Math.max(1, a.count)));
+  const sortedRecipes = Object.values(recipeStats)
+    .filter(stat => stat.count > 0 && stat.title && stat.title !== 'Untitled') // Only show recipes with ratings and valid titles
+    .sort((a, b) => (b.totalRating / Math.max(1, b.count)) - (a.totalRating / Math.max(1, a.count)));
   const [showAll, setShowAll] = useState(false);
   const findRecipeForStat = (stat: { comments: RecipeRating[] }) => {
     const ratingWithRecipe = stat.comments.find(c => c.recipe && c.recipe.ingredients && c.recipe.instructions);

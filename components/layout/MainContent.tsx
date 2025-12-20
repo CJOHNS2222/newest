@@ -13,6 +13,7 @@ import { User, PantryItem, DayPlan, StructuredRecipe, Household, ShoppingItem, S
 
 interface MainContentProps {
   activeTab: Tab;
+  setActiveTab: (tab: Tab) => void;
   user: User;
   inventory: PantryItem[];
   setInventory: (inventory: PantryItem[]) => void;
@@ -37,6 +38,7 @@ interface MainContentProps {
 
 export const MainContent: React.FC<MainContentProps> = ({
   activeTab,
+  setActiveTab,
   user,
   inventory,
   setInventory,
@@ -76,6 +78,8 @@ export const MainContent: React.FC<MainContentProps> = ({
           onAddToPlan={onAddToPlan}
           onSaveRecipe={onSaveRecipe}
           onMarkAsMade={()=>{}}
+          user={user}
+          setActiveTab={setActiveTab}
         />
       )}
       {activeTab === Tab.SHOPPING && (
@@ -95,6 +99,8 @@ export const MainContent: React.FC<MainContentProps> = ({
           ratings={ratings}
           onRate={onRateRecipe}
           savedRecipes={savedRecipes}
+          user={user}
+          setActiveTab={setActiveTab}
           onShareRecipe={(recipe) => {
             alert(`Recipe shared: ${recipe.title}`);
           }}

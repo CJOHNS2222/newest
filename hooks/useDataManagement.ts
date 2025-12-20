@@ -33,11 +33,13 @@ export function useDataManagement(user: User | null, addToast: (message: string,
   useEffect(() => {
     if (!user?.id) return;
 
+    console.log('useDataManagement: Setting up listeners for user:', user.id);
+
     const unsubs: (()=>void)[] = [];
 
     // Listener for user's own inventory
     unsubs.push(onSnapshot(collection(db, 'users', user.id, 'inventory'), snap => {
-      console.log('Inventory listener fired, docs:', snap.docs.length);
+      console.log('Inventory listener fired, docs:', snap.docs.length, 'for user:', user.id);
       setInventory(snap.docs.map(d => d.data() as PantryItem));
     }, err => console.error("Inventory listener failed:", err)));
 
@@ -47,7 +49,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     if (inHousehold) {
       // Household listeners
       unsubs.push(onSnapshot(collection(db, 'households', household.id, 'shoppingList'), snap => {
-        console.log('Household shopping list listener fired, docs:', snap.docs.length);
+        console.log('Household shopping list listener fired, docs:', snap.docs.length, 'for household:', household.id);
         const data = snap.docs.map(d => {
           const docData = d.data();
           return {
@@ -103,7 +105,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
     } else {
       // Individual user listeners
       unsubs.push(onSnapshot(collection(db, 'users', user.id, 'shoppingList'), snap => {
-        console.log('User shopping list listener fired, docs:', snap.docs.length);
+        console.log('User shopping list listener fired, docs:', snap.docs.length, 'for user:', user.id);
         const data = snap.docs.map(d => {
           const docData = d.data();
           return {
@@ -269,7 +271,7 @@ export function useDataManagement(user: User | null, addToast: (message: string,
         (window as any).__writingMealPlan = false;
       }
     })();
-  }, [user?.id, household?.id, inventory, savedRecipes, mealPlan]);
+    }, [user?.id, household?.id, inventory, savedRecipes, mealPlan, shoppingList]);
 
   // Shopping list sync
   useEffect(() => {

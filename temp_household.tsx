@@ -15,7 +15,7 @@ interface HouseholdManagerProps {
 
 export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, household, setHousehold, onClose }) => {
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteLoading, setInviteLoading] = useState(false);
+  const [isInviting, setIsInviting] = useState(false);
   const [inviteMessage, setInviteMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -25,7 +25,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       return;
     }
 
-    setInviteLoading(true);
+    setIsInviting(true);
     setInviteMessage(null);
 
     try {
@@ -33,7 +33,7 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
       const memberExists = household.members.some(m => m.email.toLowerCase() === inviteEmail.toLowerCase());
       if (memberExists) {
         setInviteMessage({ type: 'error', text: 'This member is already in your household' });
-        setInviteLoading(false);
+        setIsInviting(false);
         return;
       }
 
@@ -181,13 +181,8 @@ export const HouseholdManager: React.FC<HouseholdManagerProps> = ({ user, househ
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   placeholder="Enter email address"
-<<<<<<< HEAD
-                  disabled={inviteLoading}
-                  className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-amber-500 outline-none disabled:opacity-50"
-=======
                   className="w-full bg-[#2A0A10] border border-red-900/50 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-amber-500 outline-none"
                   disabled={isInviting}
->>>>>>> 83c3efa68351cacc8dfc1f64af3dc3f190a40c93
                 />
               </div>
               <button 

@@ -83,6 +83,15 @@ export interface User {
   avatar?: string;
   provider: 'email' | 'google' | 'facebook';
   hasSeenTutorial: boolean;
+  subscription?: Subscription;
+}
+
+export interface Subscription {
+  tier: 'free' | 'premium' | 'family';
+  status: 'active' | 'cancelled' | 'past_due' | 'trialing';
+  current_period_end: Date;
+  cancel_at_period_end: boolean;
+  trial_end?: Date;
 }
 
 export interface Member {

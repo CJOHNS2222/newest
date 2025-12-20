@@ -42,7 +42,17 @@ module.exports = {
         project: null,
       },
     },
+    {
+      files: ["**/*.js"],
+      parserOptions: {
+        project: null,
+      },
+      rules: {
+        "@typescript-eslint/no-var-requires": "off",
+        "@typescript-eslint/explicit-function-return-type": "off",
+      },
+    },
   ],
   globals: {},
-  ignorePatterns: ["lib/**/*", "node_modules/**/*", "src/dataconnect-admin-generated/**/*"],
+  ignorePatterns: ["lib/**/*", "node_modules/**/*", "src/dataconnect-admin-generated/**/*", "index.js"],
 };

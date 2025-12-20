@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { SubscriptionManager } from './SubscriptionManager';
 
 const defaultSettings = {
   notifications: {
@@ -31,8 +32,6 @@ interface SettingsProps {
 
 export const Settings: React.FC<SettingsProps> = ({ settings, setSettings, user, onLogout }) => {
   // ...existing code...
-  const [pendingTheme, setPendingTheme] = useState(settings.theme);
-  const [themeChanged, setThemeChanged] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
   const [pendingNotifications, setPendingNotifications] = useState(settings.notifications);
@@ -49,21 +48,14 @@ export const Settings: React.FC<SettingsProps> = ({ settings, setSettings, user,
     setNotifChanged(true);
   };
 
-  // For notifications and theme, use pending state until confirmed
     const handleThemeChange = (key: string, value: any) => {
-      setPendingTheme(prev => ({
-        ...prev,
-        [key]: value,
-      }));
-      setThemeChanged(false);
-    };
-
-    const confirmThemeChanges = () => {
       setSettings(prev => ({
         ...prev,
-        theme: pendingTheme
+        theme: {
+          ...prev.theme,
+          [key]: value
+        }
       }));
-      setThemeChanged(true);
     };
   const handleNotifChange = (key: string, value: any) => {
     setPendingNotifications(prev => ({
@@ -175,7 +167,7 @@ export const Settings: React.FC<SettingsProps> = ({ settings, setSettings, user,
             <label className="block mb-2">
               <span className="mr-2">Mode:</span>
               <select
-                value={pendingTheme.mode}
+                value={settings.theme.mode}
                 onChange={(e) => handleThemeChange('mode', e.target.value)}
                 className="border rounded px-2 py-1"
               >
@@ -187,7 +179,7 @@ export const Settings: React.FC<SettingsProps> = ({ settings, setSettings, user,
               <span className="mr-2">Accent Color:</span>
               <input
                 type="color"
-                value={pendingTheme.accentColor}
+                value={settings.theme.accentColor}
                 onChange={(e) => handleThemeChange('accentColor', e.target.value)}
                 className="border rounded px-2 py-1"
               />
@@ -196,23 +188,17 @@ export const Settings: React.FC<SettingsProps> = ({ settings, setSettings, user,
               <span className="mr-2">Background Color:</span>
               <input
                 type="color"
-                value={pendingTheme.backgroundColor || '#ffffff'}
+                value={settings.theme.backgroundColor || '#ffffff'}
                 onChange={(e) => handleThemeChange('backgroundColor', e.target.value)}
                 className="border rounded px-2 py-1"
               />
             </label>
-            <button
-              type="button"
-              onClick={confirmThemeChanges}
-              className="mt-3 bg-[var(--accent-color)] text-white px-4 py-2 rounded font-bold w-full"
-            >
-              Confirm Theme Changes
-            </button>
-            {themeChanged && (
-              <div className="mt-2 text-green-600 font-bold text-center animate-fade-in">
-                Theme settings have been changed
-              </div>
-            )}
+          </div>
+        )}
+        {user && (
+          <div className="mb-6">
+            <h3 className="font-semibold mb-2">Subscription</h3>
+            <SubscriptionManager />
           </div>
         )}
         <button

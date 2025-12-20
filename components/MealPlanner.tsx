@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { CalendarClock, Plus, Move, AlertCircle, ShoppingBasket, Trash2 } from 'lucide-react';
-import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe } from '../types';
+import { DayPlan, MealPlanItem, PantryItem, StructuredRecipe, User } from '../types';
 import RecipeModal from './RecipeModal';
+import { PremiumFeature } from './PremiumFeature';
+import { Tab } from '../types/app';
 
 interface MealPlannerProps {
   mealPlan: DayPlan[];
@@ -11,9 +13,11 @@ interface MealPlannerProps {
   onAddToPlan?: (recipe: StructuredRecipe) => void;
   onSaveRecipe?: (recipe: StructuredRecipe) => void;
   onMarkAsMade?: (recipe: StructuredRecipe) => void;
+  user: User;
+  setActiveTab: (tab: Tab) => void;
 }
 
-export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade }) => {
+export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan, inventory, addToShoppingList, onAddToPlan, onSaveRecipe, onMarkAsMade, user, setActiveTab }) => {
     // List of staple items to ignore
     const STAPLES = ['salt', 'pepper', 'oil', 'water', 'flour', 'sugar', 'butter', 'vinegar', 'baking powder', 'baking soda', 'spices', 'seasoning', 'soy sauce', 'cornstarch', 'yeast'];
   const [draggedMeal, setDraggedMeal] = useState<{ dayIndex: number, mealIndex: number } | null>(null);
@@ -87,26 +91,34 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
         <p className="text-theme-secondary opacity-60 text-sm mt-1">Plan your week ahead</p>
       </div>
 
-      <button 
-        onClick={handleAddMissingToShopping}
-        disabled={missingItemsCount === 0}
-        className={`w-full border font-medium py-3 rounded-xl transition-all flex items-center justify-center gap-2 mb-6 ${
-            missingItemsCount > 0 
-            ? 'bg-theme-secondary border-[var(--accent-color)] text-[var(--accent-color)] shadow-lg' 
-            : 'opacity-50 cursor-not-allowed border-theme'
-        }`}
+      <PremiumFeature
+        feature="mealPlanning"
+        user={user}
+        limit={10}
+        currentCount={mealPlan.reduce((total, day) => total + day.meals.length, 0)}
+        fallbackMessage="Upgrade to Premium to plan more than 10 meals per week"
+        onUpgrade={() => setActiveTab(Tab.SETTINGS)}
       >
-        <ShoppingBasket className="w-5 h-5" />
-        {missingItemsCount > 0 ? `Add ${missingItemsCount} Missing Items to List` : "Pantry is Stocked"}
-      </button>
+        <button 
+          onClick={handleAddMissingToShopping}
+          disabled={missingItemsCount === 0}
+          className={`w-full border font-medium py-3 rounded-xl transition-all flex items-center justify-center gap-2 mb-6 ${
+              missingItemsCount > 0 
+              ? 'bg-theme-secondary border-[var(--accent-color)] text-[var(--accent-color)] shadow-lg' 
+              : 'opacity-50 cursor-not-allowed border-theme'
+          }`}
+        >
+          <ShoppingBasket className="w-5 h-5" />
+          {missingItemsCount > 0 ? `Add ${missingItemsCount} Missing Items to List` : "Pantry is Stocked"}
+        </button>
 
-      <div className="space-y-4">
-        {mealPlan.map((day, dayIndex) => (
-          <div 
-            key={dayIndex}
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, dayIndex)}
-            className="bg-theme-secondary p-4 rounded-xl border border-theme shadow-sm min-h-[100px] transition-all"
+        <div className="space-y-4">
+          {mealPlan.map((day, dayIndex) => (
+            <div 
+              key={dayIndex}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, dayIndex)}
+              className="bg-theme-secondary p-4 rounded-xl border border-theme shadow-sm min-h-[100px] transition-all"
           >
             <div className="flex justify-between items-start mb-2 pointer-events-none">
               <div>
@@ -144,7 +156,8 @@ export const MealPlanner: React.FC<MealPlannerProps> = ({ mealPlan, setMealPlan,
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      </PremiumFeature>
       {/* Modal for full recipe details */}
       {showRecipeModal && modalRecipe && (
         <RecipeModal

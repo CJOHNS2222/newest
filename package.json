@@ -7,15 +7,21 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
     "generate:icons": "npx pwa-asset-generator public/icons/icon512.png resources --manifest ./public/manifest.webmanifest --favicon --index --android --ios"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",
+    "@capacitor/browser": "^7.0.3",
     "@capacitor/camera": "^7.0.2",
     "@capacitor/cli": "^7.4.4",
     "@capacitor/core": "^7.4.4",
     "@capacitor/local-notifications": "^7.0.3",
     "@google/genai": "^1.31.0",
+    "@paypal/react-paypal-js": "^8.9.2",
+    "@stripe/react-stripe-js": "^5.4.1",
+    "@stripe/stripe-js": "^8.5.3",
     "adb": "^0.2.0",
     "firebase": "^12.6.0",
     "lucide-react": "^0.555.0",
@@ -23,11 +29,16 @@
     "react-dom": "^19.2.1"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "eslint-plugin-import": "^2.32.0",
+    "jsdom": "^27.3.0",
     "typescript": "~5.8.2",
     "vite": "^6.4.1",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^4.0.15"
   }
 }
